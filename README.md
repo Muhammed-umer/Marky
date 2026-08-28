@@ -19,4 +19,4 @@ A source-grounded technology reader built with Next.js, Clerk, and Supabase.
 
 The browser only receives the Clerk publishable key and Supabase publishable key. `CLERK_SECRET_KEY` and `SUPABASE_SECRET_KEY` stay server-only. The live feed route provisions a minimal profile on a user’s first authenticated request.
 
-See `MARKY_PROJECT_SPEC.md` for the full product contract and `PROGRESS.md` for implementation status.
+See `docs/MARKY_PROJECT_SPEC.md` for the full product contract, `docs/PROGRESS.md` for implementation status, and `docs/NEW_UPDATES.md` for the change summary.

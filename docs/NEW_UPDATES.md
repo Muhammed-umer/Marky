@@ -1,7 +1,7 @@
 # Marky — New Updates
 
 **Document date:** 2026-08-28  
-**Source:** `MARKY_PROJECT_SPEC.md`  
+**Source:** `docs/MARKY_PROJECT_SPEC.md`  
 **Specification status:** V1 implementation specification
 
 This document records the product and engineering decisions currently defined for Marky. It can be updated as implementation work introduces additional features, changes, or limitations.

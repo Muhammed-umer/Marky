@@ -2,6 +2,7 @@ node_modules/
 .next/
 .vercel/
 coverage/
+*.tsbuildinfo
 .env*
 !.env.example
 *.log
