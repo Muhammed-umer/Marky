@@ -1,27 +1,33 @@
 @import "tailwindcss";
 
-@layer base {
-  :root {
-    --bg-paper: #FBF9F5;
-    --bg-paper-secondary: #F4F0EA;
-    --bg-surface: #FFFFFF;
-    --text-charcoal: #1F1F1F;
-    --text-muted: #57534E;
-    --accent-vermillion: #E03E2F;
-    --accent-vermillion-hover: #C4321A;
-    --border-rule: #E6E2DA;
-  }
+@theme {
+  --color-paper: #FBF9F5;
+  --color-paper-secondary: #F4F0EA;
+  --color-paper-card: #FFFFFF;
 
+  --color-charcoal: #1F1F1F;
+  --color-charcoal-muted: #57534E;
+
+  --color-vermillion: #E03E2F;
+  --color-vermillion-hover: #C4321A;
+
+  --color-rule: #E6E2DA;
+
+  --font-serif: "Newsreader", Georgia, serif;
+  --font-sans: "Inter", "Plus Jakarta Sans", system-ui, sans-serif;
+}
+
+@layer base {
   body {
-    background-color: #FBF9F5;
-    color: #1F1F1F;
-    font-family: 'Inter', system-ui, sans-serif;
+    background-color: var(--color-paper, #FBF9F5);
+    color: var(--color-charcoal, #1F1F1F);
+    font-family: var(--font-sans, 'Inter', system-ui, sans-serif);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
   h1, h2, h3, h4, h5, h6, .font-serif-heading {
-    font-family: 'Newsreader', Georgia, serif;
+    font-family: var(--font-serif, 'Newsreader', Georgia, serif);
   }
 }
 
