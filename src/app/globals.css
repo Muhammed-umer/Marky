@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --bg-paper: #FBF9F5;
+    --bg-paper-secondary: #F4F0EA;
+    --bg-surface: #FFFFFF;
+    --text-charcoal: #1F1F1F;
+    --text-muted: #57534E;
+    --accent-vermillion: #E03E2F;
+    --accent-vermillion-hover: #C4321A;
+    --border-rule: #E6E2DA;
+  }
+
+  body {
+    background-color: #FBF9F5;
+    color: #1F1F1F;
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3, h4, h5, h6, .font-serif-heading {
+    font-family: 'Newsreader', Georgia, serif;
+  }
+}
+
+/* Print Stylesheet */
+@media print {
+  body {
+    background-color: #FFFFFF !important;
+    color: #000000 !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+  a {
+    text-decoration: underline;
+    color: #000000 !important;
+  }
+}
