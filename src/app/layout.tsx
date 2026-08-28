@@ -3,22 +3,15 @@ import { ClerkProvider } from "@clerk/nextjs";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Marky — Content Curation & Reading Feed",
-  description: "A calm, intelligent, editorial environment for reading, bookmarking, and managing web content.",
+  title: "Marky — Technology worth your attention",
+  description: "A calm, personalized reader for technology professionals.",
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
   return (
-    <ClerkProvider>
-      <html lang="en">
-        <body className="bg-paper text-charcoal min-h-screen antialiased selection:bg-vermillion selection:text-white">
-          {children}
-        </body>
-      </html>
-    </ClerkProvider>
+    <html lang="en">
+      <body>{publishableKey ? <ClerkProvider publishableKey={publishableKey}>{children}</ClerkProvider> : children}</body>
+    </html>
   );
 }
