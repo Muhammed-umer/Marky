@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { interestScore, recencyScore, trendingScore } from "./ranking";
+import { interestScore, rankItems, recencyScore, trendingScore } from "./ranking";
 import { demoItems } from "./demo-data";
 
 describe("ranking", () => {
@@ -9,5 +9,12 @@ describe("ranking", () => {
   });
   it("excludes unknown dates from trending with a negative score", () => {
     expect(trendingScore(demoItems[3])).toBe(-1);
+  });
+  it("uses learned interest affinity to personalize the For You order", () => {
+    const ranked = rankItems(demoItems.slice(0, 3), "for-you", [], {
+      Cybersecurity: 20,
+      "Artificial Intelligence": -5,
+    });
+    expect(ranked[0].interests).toContain("Cybersecurity");
   });
 });

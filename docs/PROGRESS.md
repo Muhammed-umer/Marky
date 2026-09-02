@@ -27,3 +27,12 @@
 - Configure Clerk’s native Supabase third-party auth integration.
 - Add environment values from `.env.example` locally and in Vercel.
 - Connect the user-owned GitHub repository to Vercel; no unrelated public repository was modified.
+
+## 2026-09-02
+
+### Completed
+
+- Restructured scheduled ingestion around a typed source-adapter dispatcher.
+- Added secure generic RSS/Atom ingestion alongside the existing Medium-specific adapter.
+- Added curated GitHub, Cloudflare, and Vercel source seeds and bounded source concurrency.
+- Kept automated X ingestion off pending an approved official API configuration and cost controls.

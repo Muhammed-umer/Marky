@@ -20,6 +20,8 @@ export interface FeedItem {
   source: string;
   author: string;
   publishedAt: string | null;
+  imageUrl?: string | null;
+  engagementCount?: number;
   interests: Interest[];
   sourceCount: number;
   saved: boolean;

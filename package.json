@@ -2,7 +2,9 @@
   "name": "marky",
   "version": "0.1.0",
   "private": true,
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -16,6 +18,7 @@
     "@clerk/nextjs": "latest",
     "@mozilla/readability": "latest",
     "@supabase/supabase-js": "latest",
+    "fast-xml-parser": "5.11.1",
     "framer-motion": "latest",
     "jsdom": "latest",
     "lucide-react": "latest",
@@ -25,6 +28,7 @@
     "zod": "latest"
   },
   "devDependencies": {
+    "@types/jsdom": "^30.0.0",
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
