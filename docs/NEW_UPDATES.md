@@ -246,3 +246,9 @@ For future changes, add a dated section below using this format:
 ### Security
 - Queue operations are available only to the server-side service role through narrowly granted database functions.
 - Submission status records use row-level security, and the status endpoint additionally verifies Clerk identity and profile ownership.
+# 2026-09-03 — Supabase schedules for Vercel Hobby deployments
+
+- Moved recurring worker scheduling from Vercel Cron to Supabase `pg_cron` + `pg_net`.
+- Supabase Vault stores the production worker URL and worker secret; neither value is committed.
+- Source ingestion runs every five minutes and link-queue processing runs every minute.
+- Vercel now hosts the Marky UI and protected worker endpoints without Hobby-incompatible cron declarations.
