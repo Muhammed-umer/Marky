@@ -33,6 +33,27 @@ Use the real calendar date of the change. If an entry is reconstructed later, sa
 
 ---
 
+## 2026-09-05 — Desktop Responsiveness, Sidebar Navigation Cleanup & Author Metadata Omission
+
+### Added
+- **`isValidAuthor` Type Helper**: Created `isValidAuthor` utility in `src/lib/types.ts` to identify missing or generic fallback author strings (`Unknown author`, `Unknown`, `N/A`, `Anonymous`, `null`, `undefined`).
+
+### Changed
+- **Fluid Desktop & Ultrawide Responsive Scaler**: Upgraded layout break scaling in `src/app/reference.css` and `src/app/reference-sections.css` for 1440px, 1600px, 1920px, and 2560px+ monitors. Removed artificial narrow max-width bottlenecks (`1080px`, `1600px`) causing large empty right-side white space on wide displays.
+- **Sidebar Navigation Cleanup**: Completely removed redundant "Discover" navigation link from sidebar while preserving `/latest` feed tab functionality.
+- **Supabase Vault Cron Migration**: Updated `supabase/migrations/20260905000000_setup_ingestion_cron.sql` to pull `marky_cron_url` and `marky_cron_secret` safely from `vault.decrypted_secrets`.
+
+### Fixed
+- **Author Metadata Omission**: Eliminated display of "Unknown author" across article cards, feed lists, and brief modal dialogs. When author metadata is missing or invalid, the author label is cleanly omitted without preceding separators.
+
+### Verification
+- `npm run typecheck`: Passed (0 errors).
+- `npm run lint`: Passed (0 errors, 0 warnings).
+- `npm test`: Passed (18/18 tests passed across 7 test suites).
+- `npm run build`: Passed (0 errors, Next.js app bundle generated).
+
+---
+
 ## 2026-09-05 — Modernize Clerk Fallback Redirects & Add Authentication Observability
 
 ### Added

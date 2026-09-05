@@ -923,112 +923,261 @@ button:disabled{cursor:not-allowed}
   color: var(--reader-ink, #242424);
 }
 
-/* Responsive Progressive Scaler for Large Desktop & Ultrawide Monitors */
-@media (min-width: 1600px) {
+/* Responsive Progressive Scaler for Desktop & Ultrawide Monitors */
+@media (min-width: 1440px) {
   .public-header-inner {
-    max-width: 1360px;
+    max-width: 1380px;
   }
   .public-hero {
-    max-width: 1080px;
-    padding-top: 72px;
+    max-width: 1040px;
+    padding-top: 64px;
   }
   .public-hero h1 {
-    font-size: 64px;
-    max-width: 960px;
+    font-size: 58px;
+    max-width: 920px;
     margin-inline: auto;
   }
   .public-hero-desc {
     max-width: 780px;
+    font-size: 19px;
+  }
+  .public-preview-wrapper {
+    max-width: 1320px;
+    margin-bottom: 80px;
+  }
+  .public-workflow-section {
+    max-width: 1380px;
+    margin-bottom: 90px;
+  }
+  .public-features-section {
+    max-width: 1380px;
+    margin-bottom: 90px;
+  }
+  .public-topics-section {
+    max-width: 1320px;
+    margin-bottom: 90px;
+  }
+  .public-cta-section {
+    max-width: 1320px;
+    margin-bottom: 90px;
+  }
+  .public-footer-inner {
+    max-width: 1380px;
+  }
+
+  .reader-shell {
+    max-width: 1540px;
+    grid-template-columns: 250px minmax(0, 1fr) 350px;
+  }
+}
+
+@media (min-width: 1600px) {
+  .public-header-inner {
+    max-width: 1520px;
+  }
+  .public-hero {
+    max-width: 1160px;
+    padding-top: 76px;
+  }
+  .public-hero h1 {
+    font-size: 64px;
+    max-width: 1040px;
+    margin-inline: auto;
+  }
+  .public-hero-desc {
+    max-width: 840px;
     font-size: 20px;
   }
   .public-preview-wrapper {
-    max-width: 1200px;
-    margin-bottom: 90px;
+    max-width: 1480px;
+    margin-bottom: 96px;
   }
   .public-preview-body {
-    padding: 40px 48px;
-    gap: 32px;
+    padding: 44px 52px;
+    gap: 36px;
   }
   .public-mock-title {
     font-size: 26px;
   }
   .public-workflow-section {
-    max-width: 1280px;
+    max-width: 1520px;
     margin-bottom: 100px;
   }
   .public-features-section {
-    max-width: 1280px;
-    margin-bottom: 100px;
-  }
-  .public-features-grid {
-    gap: 28px;
-  }
-  .public-feature-card {
-    padding: 34px 36px;
-  }
-  .public-topics-section {
-    max-width: 1200px;
-    margin-bottom: 100px;
-  }
-  .public-cta-section {
-    max-width: 1200px;
-    margin-bottom: 100px;
-  }
-  .public-footer-inner {
-    max-width: 1280px;
-  }
-}
-
-@media (min-width: 2200px) {
-  .public-header-inner {
-    max-width: 1560px;
-  }
-  .public-hero {
-    max-width: 1240px;
-    padding-top: 84px;
-  }
-  .public-hero h1 {
-    font-size: 72px;
-    max-width: 1100px;
-    margin-inline: auto;
-  }
-  .public-hero-desc {
-    max-width: 860px;
-    font-size: 22px;
-  }
-  .public-preview-wrapper {
-    max-width: 1440px;
-    margin-bottom: 110px;
-  }
-  .public-preview-body {
-    padding: 48px 56px;
-    gap: 36px;
-  }
-  .public-mock-title {
-    font-size: 28px;
-  }
-  .public-workflow-section {
     max-width: 1520px;
-    margin-bottom: 120px;
-  }
-  .public-features-section {
-    max-width: 1520px;
-    margin-bottom: 120px;
+    margin-bottom: 100px;
   }
   .public-features-grid {
     grid-template-columns: repeat(4, 1fr);
     gap: 24px;
   }
+  .public-feature-card {
+    padding: 34px 36px;
+  }
   .public-topics-section {
     max-width: 1440px;
-    margin-bottom: 120px;
+    margin-bottom: 100px;
   }
   .public-cta-section {
     max-width: 1440px;
-    margin-bottom: 120px;
+    margin-bottom: 100px;
   }
   .public-footer-inner {
     max-width: 1520px;
+  }
+
+  .reader-shell {
+    max-width: 1720px;
+    grid-template-columns: 260px minmax(0, 1fr) 360px;
+  }
+  .reader-header {
+    grid-template-columns: 260px minmax(0, 1fr) auto;
+    padding: 0 36px;
+  }
+  .feed-story {
+    grid-template-columns: minmax(0, 1fr) 210px;
+    gap: 32px;
+  }
+}
+
+@media (min-width: 1920px) {
+  .public-header-inner {
+    max-width: 1760px;
+  }
+  .public-hero {
+    max-width: 1280px;
+    padding-top: 84px;
+  }
+  .public-hero h1 {
+    font-size: 72px;
+    max-width: 1140px;
+    margin-inline: auto;
+  }
+  .public-hero-desc {
+    max-width: 880px;
+    font-size: 21px;
+  }
+  .public-preview-wrapper {
+    max-width: 1680px;
+    margin-bottom: 110px;
+  }
+  .public-preview-body {
+    padding: 48px 56px;
+    gap: 40px;
+  }
+  .public-mock-title {
+    font-size: 28px;
+  }
+  .public-workflow-section {
+    max-width: 1760px;
+    margin-bottom: 120px;
+  }
+  .public-features-section {
+    max-width: 1760px;
+    margin-bottom: 120px;
+  }
+  .public-features-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 28px;
+  }
+  .public-topics-section {
+    max-width: 1620px;
+    margin-bottom: 120px;
+  }
+  .public-cta-section {
+    max-width: 1620px;
+    margin-bottom: 120px;
+  }
+  .public-footer-inner {
+    max-width: 1760px;
+  }
+
+  .reader-shell {
+    max-width: 1880px;
+    grid-template-columns: 280px minmax(0, 1fr) 380px;
+  }
+  .reader-header {
+    grid-template-columns: 280px minmax(0, 1fr) auto;
+    padding: 0 44px;
+  }
+  .reader-main {
+    padding: 56px 64px 96px;
+  }
+  .feed-story {
+    grid-template-columns: minmax(0, 1fr) 230px;
+    gap: 36px;
+  }
+  .story-title h2 {
+    font-size: 26px;
+  }
+}
+
+@media (min-width: 2560px) {
+  .public-header-inner {
+    max-width: 2200px;
+  }
+  .public-hero {
+    max-width: 1500px;
+    padding-top: 96px;
+  }
+  .public-hero h1 {
+    font-size: 80px;
+    max-width: 1320px;
+    margin-inline: auto;
+  }
+  .public-hero-desc {
+    max-width: 980px;
+    font-size: 23px;
+  }
+  .public-preview-wrapper {
+    max-width: 2100px;
+    margin-bottom: 130px;
+  }
+  .public-preview-body {
+    padding: 56px 64px;
+    gap: 48px;
+  }
+  .public-mock-title {
+    font-size: 30px;
+  }
+  .public-workflow-section {
+    max-width: 2200px;
+    margin-bottom: 140px;
+  }
+  .public-features-section {
+    max-width: 2200px;
+    margin-bottom: 140px;
+  }
+  .public-features-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 32px;
+  }
+  .public-topics-section {
+    max-width: 2000px;
+    margin-bottom: 140px;
+  }
+  .public-cta-section {
+    max-width: 2000px;
+    margin-bottom: 140px;
+  }
+  .public-footer-inner {
+    max-width: 2200px;
+  }
+
+  .reader-shell {
+    max-width: 2360px;
+    grid-template-columns: 320px minmax(0, 1fr) 440px;
+  }
+  .reader-header {
+    grid-template-columns: 320px minmax(0, 1fr) auto;
+    padding: 0 56px;
+  }
+  .reader-main {
+    padding: 64px 80px 120px;
+  }
+  .feed-story {
+    grid-template-columns: minmax(0, 1fr) 260px;
+    gap: 44px;
   }
 }
 

@@ -30,8 +30,7 @@ async function runIngestion(request: Request) {
     supabase
       .from("sources")
       .select("id,name,source_type,feed_url,site_url,etag,last_modified,last_success_at,last_fetched_at,fetch_interval_minutes")
-      .eq("is_active", true)
-      .limit(30),
+      .eq("is_active", true),
     supabase.from("topics").select("id,name"),
   ]);
   if (sourceError || topicError) {

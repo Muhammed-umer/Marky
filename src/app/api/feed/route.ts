@@ -2,7 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import { demoItems } from "@/lib/demo-data";
 import { rankItems } from "@/lib/ranking";
-import { interests, type FeedItem, type FeedView, type Interest } from "@/lib/types";
+import { interests, isValidAuthor, type FeedItem, type FeedView, type Interest } from "@/lib/types";
 import { createAdminSupabaseClient } from "@/lib/supabase";
 
 function relationName(value: { name: string } | Array<{ name: string }> | null | undefined) {
@@ -98,7 +98,7 @@ export async function GET(request: NextRequest) {
       excerpt: row.summary ?? "Open the original source to read this story.",
       url: row.canonical_url,
       source: relationName(row.source) ?? new URL(row.canonical_url).hostname,
-      author: row.author ?? "Unknown author",
+      author: row.author && isValidAuthor(row.author) ? row.author : null,
       publishedAt: row.published_at,
       imageUrl: row.image_url,
       engagementCount: 0,

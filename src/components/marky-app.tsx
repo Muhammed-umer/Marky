@@ -29,7 +29,7 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AuthControls } from "@/components/auth-controls";
 import { rankItems } from "@/lib/ranking";
-import { interests, type FeedItem, type FeedView, type Interest } from "@/lib/types";
+import { interests, isValidAuthor, type FeedItem, type FeedView, type Interest } from "@/lib/types";
 
 const viewCopy: Record<FeedView, { label: string; title: string; subtitle: string }> = {
   "for-you": { label: "For you", title: "Your daily technology briefing", subtitle: "A focused mix from the topics and sources you care about." },
@@ -908,21 +908,7 @@ function MarkyExperience({
           <Link className={initialPage === "profile" ? "nav-link active" : "nav-link"} href="/profile">
             <UserRound size={22} /> Profile
           </Link>
-          {initialPage !== "home" ? (
-            <Link className="nav-link" href="/#briefing">
-              <Compass size={22} /> Discover
-            </Link>
-          ) : (
-            <button
-              className={!savedOnly && view === "latest" ? "nav-link active" : "nav-link"}
-              onClick={() => {
-                setSavedOnly(false);
-                selectView("latest");
-              }}
-            >
-              <Compass size={22} /> Discover
-            </button>
-          )}
+
         </nav>
         {isSignedIn ? (
           <div className="nav-prompt">
@@ -1077,9 +1063,13 @@ function MarkyExperience({
                   >
                     <div className="story-copy">
                       <div className="story-byline">
-                        <span className="author-avatar">{item.author.charAt(0)}</span>
-                        <span>{item.author}</span>
-                        <span>·</span>
+                        {isValidAuthor(item.author) ? (
+                          <>
+                            <span className="author-avatar">{item.author.charAt(0)}</span>
+                            <span>{item.author}</span>
+                            <span>·</span>
+                          </>
+                        ) : null}
                         <span>{storyDate(item.publishedAt)}</span>
                       </div>
                       <button className="story-title" type="button" onClick={() => openBrief(item)}>
@@ -1373,8 +1363,12 @@ function MarkyExperience({
                 <p className="section-kicker">{selectedItem.interests[0]} brief</p>
                 <h2 id="brief-title">{selectedItem.title}</h2>
                 <div className="brief-meta">
-                  <span>{selectedItem.author}</span>
-                  <span>·</span>
+                  {isValidAuthor(selectedItem.author) ? (
+                    <>
+                      <span>{selectedItem.author}</span>
+                      <span>·</span>
+                    </>
+                  ) : null}
                   <span>{selectedItem.source}</span>
                   <span>·</span>
                   <span>{storyDate(selectedItem.publishedAt)}</span>

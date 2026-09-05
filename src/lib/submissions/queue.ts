@@ -4,7 +4,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { classifyContent } from "@/lib/ingestion/classify";
 import { fetchWebMetadata } from "@/lib/ingestion/web";
 import type { FeedItem, Interest } from "@/lib/types";
+import { isValidAuthor } from "@/lib/types";
 import { urlHash } from "@/lib/url";
+
 
 const queueMessageSchema = z.object({
   submissionId: z.string().uuid(),
@@ -80,7 +82,7 @@ async function persistArticle(client: SupabaseClient, message: z.infer<typeof qu
     excerpt: metadata.summary ?? "Open the original source to read this story.",
     url: metadata.canonicalUrl,
     source: host,
-    author: metadata.author ?? "Unknown author",
+    author: metadata.author && isValidAuthor(metadata.author) ? metadata.author : null,
     publishedAt: metadata.publishedAt,
     imageUrl: null,
     engagementCount: 0,

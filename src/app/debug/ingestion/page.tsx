@@ -335,7 +335,7 @@ export default async function IngestionDebugPage() {
                 <div key={rIdx} style={{ padding: "10px", background: "#ffffff", borderRadius: "6px", marginBottom: "8px", border: "1px solid #e7e7e4" }}>
                   <p style={{ margin: "0 0 4px", fontWeight: 700 }}><a href={raw.canonicalUrl} target="_blank" rel="noreferrer" style={{ color: "#176b45" }}>{raw.title}</a></p>
                   <p style={{ margin: "0", color: "#6b6b67", fontSize: "11px" }}>
-                    Author: {raw.author ?? "Unknown"} | Published: {raw.publishedAt ?? "Date unknown"} | GUID: {raw.externalId ?? "None"}
+                    Author: {raw.author ? raw.author : "None"} | Published: {raw.publishedAt ?? "Date unknown"} | GUID: {raw.externalId ?? "None"}
                   </p>
                   {raw.summary ? <p style={{ margin: "6px 0 0", color: "#44443f", fontSize: "11px" }}>{raw.summary.slice(0, 200)}…</p> : null}
                 </div>
