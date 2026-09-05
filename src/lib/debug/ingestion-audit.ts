@@ -79,6 +79,15 @@ export interface SupabaseCronStatus {
   isConfigured: boolean;
 }
 
+export interface AuthDiagnostic {
+  isPublishableKeyConfigured: boolean;
+  publishableKeyPrefix: "pk_test" | "pk_live" | "MISSING";
+  isSecretKeyConfigured: boolean;
+  secretKeyPrefix: "sk_test" | "sk_live" | "MISSING";
+  keyPairStatus: "VALID_DEV_PAIR" | "VALID_PROD_PAIR" | "MISMATCHED_KEYS" | "INCOMPLETE_KEYS";
+  clerkInstanceDomain: string | null;
+}
+
 export interface SchedulerAuditData {
   triggerEndpoint: string;
   authentication: string;
@@ -313,11 +322,44 @@ async function performLiveFetchDiagnostic(
 
 export async function getIngestionAuditData(): Promise<{
   scheduler: SchedulerAuditData;
+  auth: AuthDiagnostic;
   recentRuns: IngestionRunRecord[];
   topics: TopicAuditData[];
 }> {
   const admin = createAdminSupabaseClient();
   const lowFrequencySources = new Set(["React Blog", "TypeScript Blog"]);
+
+  const pubKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ?? "";
+  const secKey = process.env.CLERK_SECRET_KEY ?? "";
+
+  const pubPrefix = pubKey.startsWith("pk_test_") ? "pk_test" : pubKey.startsWith("pk_live_") ? "pk_live" : "MISSING";
+  const secPrefix = secKey.startsWith("sk_test_") ? "sk_test" : secKey.startsWith("sk_live_") ? "sk_live" : "MISSING";
+
+  let keyPairStatus: "VALID_DEV_PAIR" | "VALID_PROD_PAIR" | "MISMATCHED_KEYS" | "INCOMPLETE_KEYS" = "INCOMPLETE_KEYS";
+  if (pubPrefix === "pk_test" && secPrefix === "sk_test") keyPairStatus = "VALID_DEV_PAIR";
+  else if (pubPrefix === "pk_live" && secPrefix === "sk_live") keyPairStatus = "VALID_PROD_PAIR";
+  else if (pubPrefix !== "MISSING" && secPrefix !== "MISSING") keyPairStatus = "MISMATCHED_KEYS";
+
+  let clerkInstanceDomain: string | null = null;
+  if (pubKey.includes("_")) {
+    const rawPayload = pubKey.split("_")[2] ?? "";
+    if (rawPayload) {
+      try {
+        clerkInstanceDomain = Buffer.from(rawPayload, "base64").toString("utf8").replace(/\$$/, "");
+      } catch {
+        clerkInstanceDomain = null;
+      }
+    }
+  }
+
+  const auth: AuthDiagnostic = {
+    isPublishableKeyConfigured: Boolean(pubKey),
+    publishableKeyPrefix: pubPrefix,
+    isSecretKeyConfigured: Boolean(secKey),
+    secretKeyPrefix: secPrefix,
+    keyPairStatus,
+    clerkInstanceDomain,
+  };
 
   let pgCronStatus: SupabaseCronStatus | string = "NOT CONFIGURED / PENDING MIGRATION";
 
@@ -351,7 +393,7 @@ export async function getIngestionAuditData(): Promise<{
   };
 
   if (!admin) {
-    return { scheduler, recentRuns: [], topics: [] };
+    return { scheduler, auth, recentRuns: [], topics: [] };
   }
 
   // Fetch ingestion runs
@@ -519,5 +561,5 @@ export async function getIngestionAuditData(): Promise<{
     });
   }
 
-  return { scheduler, recentRuns, topics: topicAudits };
+  return { scheduler, auth, recentRuns, topics: topicAudits };
 }

@@ -28,7 +28,7 @@ function statusBadge(status: string) {
 }
 
 export default async function IngestionDebugPage() {
-  const { scheduler, recentRuns, topics } = await getIngestionAuditData();
+  const { scheduler, auth, recentRuns, topics } = await getIngestionAuditData();
 
   return (
     <div style={{ padding: "40px 24px", maxWidth: "1400px", margin: "0 auto", fontFamily: "system-ui, -apple-system, sans-serif", color: "#242424", background: "#fbf9f5", minHeight: "100vh" }}>
@@ -45,6 +45,31 @@ export default async function IngestionDebugPage() {
           Live diagnostic audit inspecting RSS/Atom data fetching, parsing, deduplication, topic classification, database storage, and feed visibility across all 12 retained technology topics.
         </p>
       </header>
+
+      {/* Auth Configuration Diagnostic */}
+      <section style={{ padding: "24px", borderRadius: "12px", background: "#ffffff", border: "1px solid #e7e7e4", marginBottom: "32px", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
+        <h2 style={{ margin: "0 0 16px", fontSize: "18px", fontFamily: "Georgia, serif" }}>Clerk Authentication Environment Diagnostic</h2>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "16px", fontSize: "13px" }}>
+          <div style={{ padding: "12px 16px", background: "#f6f6f4", borderRadius: "8px" }}>
+            <span style={{ color: "#6b6b67", fontSize: "11px", display: "block" }}>Publishable Key Prefix</span>
+            <strong style={{ fontFamily: "monospace" }}>{auth.publishableKeyPrefix}</strong>
+          </div>
+          <div style={{ padding: "12px 16px", background: "#f6f6f4", borderRadius: "8px" }}>
+            <span style={{ color: "#6b6b67", fontSize: "11px", display: "block" }}>Secret Key Prefix</span>
+            <strong style={{ fontFamily: "monospace" }}>{auth.secretKeyPrefix}</strong>
+          </div>
+          <div style={{ padding: "12px 16px", background: "#f6f6f4", borderRadius: "8px" }}>
+            <span style={{ color: "#6b6b67", fontSize: "11px", display: "block" }}>Key Pair Compatibility</span>
+            <strong style={{ color: auth.keyPairStatus.includes("VALID") ? "#176b45" : "#b91c1c" }}>
+              {auth.keyPairStatus === "VALID_DEV_PAIR" ? "✅ Valid Dev Key Pair (pk_test + sk_test)" : auth.keyPairStatus === "VALID_PROD_PAIR" ? "✅ Valid Prod Key Pair (pk_live + sk_live)" : "❌ Mismatched / Incomplete Keys"}
+            </strong>
+          </div>
+          <div style={{ padding: "12px 16px", background: "#f6f6f4", borderRadius: "8px" }}>
+            <span style={{ color: "#6b6b67", fontSize: "11px", display: "block" }}>Clerk Instance Domain</span>
+            <strong style={{ fontFamily: "monospace" }}>{auth.clerkInstanceDomain ?? "Unconfigured"}</strong>
+          </div>
+        </div>
+      </section>
 
       {/* 1. Scheduler Status */}
       <section style={{ padding: "28px", borderRadius: "12px", background: "#ffffff", border: "1px solid #e7e7e4", marginBottom: "32px", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>

@@ -185,39 +185,41 @@ export function PublicLanding({ authEnabled }: { authEnabled: boolean }) {
     <div className="public-landing">
       {/* Header */}
       <header className="public-header">
-        <div className="public-header-left">
-          <a href="#top" className="public-brand">
-            marky
-          </a>
-        </div>
-        <nav className="public-nav-links" aria-label="Public navigation">
-          <a href="#preview">Preview</a>
-          <a href="#how-it-works">How it works</a>
-          <a href="#features">Features</a>
-          <a href="#topics">Topics</a>
-        </nav>
-        <div className="public-nav-actions">
-          {authEnabled ? (
-            <>
-              <SignInButton mode="modal">
-                <button className="public-btn-secondary">Sign in</button>
-              </SignInButton>
-              <SignUpButton mode="modal">
-                <button className="public-btn-primary">
-                  Get started <ExternalLink size={15} />
-                </button>
-              </SignUpButton>
-            </>
-          ) : (
-            <button className="public-btn-primary">Get started</button>
-          )}
-          <button
-            className="icon-button mobile-menu"
-            aria-label="Toggle navigation menu"
-            onClick={() => setMobileMenuOpen((prev) => !prev)}
-          >
-            {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
-          </button>
+        <div className="public-header-inner">
+          <div className="public-header-left">
+            <a href="#top" className="public-brand">
+              marky
+            </a>
+          </div>
+          <nav className="public-nav-links" aria-label="Public navigation">
+            <a href="#preview">Preview</a>
+            <a href="#how-it-works">How it works</a>
+            <a href="#features">Features</a>
+            <a href="#topics">Topics</a>
+          </nav>
+          <div className="public-nav-actions">
+            {authEnabled ? (
+              <>
+                <SignInButton mode="modal">
+                  <button className="public-btn-secondary">Sign in</button>
+                </SignInButton>
+                <SignUpButton mode="modal">
+                  <button className="public-btn-primary">
+                    Get started <ExternalLink size={15} />
+                  </button>
+                </SignUpButton>
+              </>
+            ) : (
+              <button className="public-btn-primary">Get started</button>
+            )}
+            <button
+              className="icon-button mobile-menu"
+              aria-label="Toggle navigation menu"
+              onClick={() => setMobileMenuOpen((prev) => !prev)}
+            >
+              {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
+            </button>
+          </div>
         </div>
       </header>
 

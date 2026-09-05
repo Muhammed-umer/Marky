@@ -377,14 +377,20 @@ button:disabled{cursor:not-allowed}
   position: sticky;
   top: 0;
   z-index: 40;
+  border-bottom: 1px solid var(--reader-line, #e7e7e4);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(12px);
+}
+
+.public-header-inner {
   display: flex;
   align-items: center;
   justify-content: space-between;
   height: 72px;
   padding: 0 40px;
-  border-bottom: 1px solid var(--reader-line, #e7e7e4);
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(12px);
+  max-width: 1400px;
+  margin: 0 auto;
+  width: 100%;
 }
 
 .public-brand {
@@ -515,7 +521,7 @@ button:disabled{cursor:not-allowed}
 
 .public-hero h1 {
   margin: 0 0 20px;
-  font: 700 clamp(38px, 5vw, 62px) / 1.05 var(--reader-serif, Georgia, serif);
+  font: 700 clamp(36px, 4.8vw, 62px) / 1.05 var(--reader-serif, Georgia, serif);
   letter-spacing: -2px;
   color: var(--reader-ink, #242424);
 }
@@ -917,7 +923,116 @@ button:disabled{cursor:not-allowed}
   color: var(--reader-ink, #242424);
 }
 
-/* Responsive Overrides */
+/* Responsive Progressive Scaler for Large Desktop & Ultrawide Monitors */
+@media (min-width: 1600px) {
+  .public-header-inner {
+    max-width: 1360px;
+  }
+  .public-hero {
+    max-width: 1080px;
+    padding-top: 72px;
+  }
+  .public-hero h1 {
+    font-size: 64px;
+    max-width: 960px;
+    margin-inline: auto;
+  }
+  .public-hero-desc {
+    max-width: 780px;
+    font-size: 20px;
+  }
+  .public-preview-wrapper {
+    max-width: 1200px;
+    margin-bottom: 90px;
+  }
+  .public-preview-body {
+    padding: 40px 48px;
+    gap: 32px;
+  }
+  .public-mock-title {
+    font-size: 26px;
+  }
+  .public-workflow-section {
+    max-width: 1280px;
+    margin-bottom: 100px;
+  }
+  .public-features-section {
+    max-width: 1280px;
+    margin-bottom: 100px;
+  }
+  .public-features-grid {
+    gap: 28px;
+  }
+  .public-feature-card {
+    padding: 34px 36px;
+  }
+  .public-topics-section {
+    max-width: 1200px;
+    margin-bottom: 100px;
+  }
+  .public-cta-section {
+    max-width: 1200px;
+    margin-bottom: 100px;
+  }
+  .public-footer-inner {
+    max-width: 1280px;
+  }
+}
+
+@media (min-width: 2200px) {
+  .public-header-inner {
+    max-width: 1560px;
+  }
+  .public-hero {
+    max-width: 1240px;
+    padding-top: 84px;
+  }
+  .public-hero h1 {
+    font-size: 72px;
+    max-width: 1100px;
+    margin-inline: auto;
+  }
+  .public-hero-desc {
+    max-width: 860px;
+    font-size: 22px;
+  }
+  .public-preview-wrapper {
+    max-width: 1440px;
+    margin-bottom: 110px;
+  }
+  .public-preview-body {
+    padding: 48px 56px;
+    gap: 36px;
+  }
+  .public-mock-title {
+    font-size: 28px;
+  }
+  .public-workflow-section {
+    max-width: 1520px;
+    margin-bottom: 120px;
+  }
+  .public-features-section {
+    max-width: 1520px;
+    margin-bottom: 120px;
+  }
+  .public-features-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 24px;
+  }
+  .public-topics-section {
+    max-width: 1440px;
+    margin-bottom: 120px;
+  }
+  .public-cta-section {
+    max-width: 1440px;
+    margin-bottom: 120px;
+  }
+  .public-footer-inner {
+    max-width: 1520px;
+  }
+}
+
+/* Tablet & Mobile Overrides */
 @media (max-width: 860px) {
   .public-workflow-grid {
     grid-template-columns: 1fr 1fr;
@@ -929,7 +1044,7 @@ button:disabled{cursor:not-allowed}
 }
 
 @media (max-width: 760px) {
-  .public-header {
+  .public-header-inner {
     padding: 0 20px;
   }
   .public-nav-links {
@@ -956,6 +1071,50 @@ button:disabled{cursor:not-allowed}
   .public-footer-inner {
     flex-direction: column;
     align-items: flex-start;
+  }
+}
+
+@media (max-width: 480px) {
+  .public-header-inner {
+    padding: 0 16px;
+  }
+  .public-hero {
+    padding: 32px 16px 20px;
+  }
+  .public-hero h1 {
+    font-size: clamp(28px, 7vw, 40px);
+    letter-spacing: -1px;
+  }
+  .public-hero-desc {
+    font-size: 15px;
+  }
+  .public-preview-wrapper {
+    padding: 0 12px;
+    margin: 20px auto 48px;
+  }
+  .public-preview-header {
+    padding: 12px 16px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .public-preview-body {
+    padding: 18px 16px;
+    gap: 20px;
+  }
+  .public-mock-title {
+    font-size: 18px;
+  }
+  .public-mock-meta {
+    flex-wrap: wrap;
+    font-size: 11px;
+  }
+  .public-mock-footer {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .public-mock-actions {
+    margin-left: 0;
   }
 }
 
