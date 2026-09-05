@@ -33,6 +33,26 @@ Use the real calendar date of the change. If an entry is reconstructed later, sa
 
 ---
 
+## 2026-09-05 — Modernize Clerk Fallback Redirects & Add Authentication Observability
+
+### Added
+- **Authentication Diagnostics Endpoint**: Added safe, non-secret authentication diagnostics (`AuthDiagnostic` collector and visualization) at `/debug/ingestion`. It reports key prefixes, key-pair validation, and Clerk instance domain without exposing private credentials.
+
+### Changed
+- **Clerk Fallback Redirect URLs**: Removed obsolete `NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/onboarding` configuration. Configured modern Next.js App Router fallback redirect variables (`NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL=/` and `NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL=/`).
+- **Updated Environment Example**: Updated `.env.example` with modern fallback keys, security warnings, and environment separation instructions.
+
+### Fixed
+- **Unauthenticated & Authenticated Modal Flow**: Preserved modal authentication UX while eliminating post-sign-up redirect failures to non-existent `/onboarding`.
+
+### Verification
+- `npm run typecheck`: Passed (0 errors).
+- `npm run lint`: Passed (0 errors, 0 warnings).
+- `npm test`: Passed (18/18 tests passed across 7 test suites).
+- `npm run build`: Passed (0 errors, clean Next.js app bundle generated).
+
+---
+
 ## 2026-09-05 — Polish Unauthenticated Landing Page Composition & Centerpiece
 
 ### Added
