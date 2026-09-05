@@ -35,4 +35,9 @@ describe("parseRssFeed", () => {
     expect(items).toHaveLength(1);
     expect(items[0]).toMatchObject({ externalId: "atom-1", author: "Alex", canonicalUrl: "https://medium.com/cloud/notes", imageUrl: "https://miro.medium.com/v2/resize:fit:1200/1-test.jpg" });
   });
+
+  it("retains an item with an unknown publication date for explicit downstream handling", () => {
+    const items = parseRssFeed(`<rss><channel><item><title>Undated release</title><link>https://example.com/release?utm_source=feed</link></item></channel></rss>`);
+    expect(items).toEqual([expect.objectContaining({ canonicalUrl: "https://example.com/release", publishedAt: null })]);
+  });
 });

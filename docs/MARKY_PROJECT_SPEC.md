@@ -1,9 +1,35 @@
 # Marky: End-to-End Product and Engineering Specification
 
-**Status:** V1 implementation specification  
+**Status:** V1 implementation specification (baseline)  
 **Audience:** Product, design, frontend, backend, data, QA, and deployment engineers  
 **Primary market:** Global English-language technology professionals  
-**Last updated:** 2026-08-28
+**Baseline written:** 2026-08-28  
+**Status note added:** 2026-09-04
+
+> **Status note (2026-09-04).** This document is the V1 engineering baseline and
+> has not been rewritten since 2026-08-28. The product direction is now defined by
+> [`PRODUCT_VISION.md`](./PRODUCT_VISION.md); where the two differ, the vision wins
+> for new work and this document remains the reference for security, schema, and
+> API rules. The implementation has diverged from the body of this document in the
+> following places. Each is recorded in [`NEW_UPDATES.md`](./NEW_UPDATES.md) and
+> tracked in [`PROGRESS.md`](./PROGRESS.md).
+>
+> | Section | Baseline says | Implementation today |
+> | --- | --- | --- |
+> | §5.1, §17 M3 | Onboarding with interest selection; interest management | Not implemented. `user_interests` exists in the schema but is unused. The feed and UI use a fixed default of three interests. |
+> | §6.1 | Medium RSS is the only automated source, polled every 45 minutes | Medium plus generic RSS/Atom (GitHub Blog, Cloudflare Blog, Vercel Changelog). Sources poll every 5 to 30 minutes; the scheduler runs every 5 minutes. |
+> | §6.1 | Feed metadata only | Medium article pages are also fetched for a publisher image and a public clap count (30-day window). |
+> | §6.2 | X URLs handled with X-specific rules | X URLs go through the generic web resolver like any other page. No X-specific handling exists. |
+> | §7.1 | `for_you = 0.65 interest + 0.35 recency` | `0.38 learned affinity + 0.22 selected interest + 0.20 recency + 0.12 engagement + 0.06 diversity + 0.02 exploration`. Saved items are pinned first. |
+> | §7.2 | `trending = 0.50 recency + 0.30 diversity + 0.20 relevance` | `0.40 recency + 0.35 engagement + 0.15 diversity + 0.10 relevance`. Items older than 45 days are excluded from the live feed. |
+> | §8.1 | "Avoid queues and extra infrastructure" | Link submissions use a `pgmq` queue with an immediate worker and a one-minute recovery worker. |
+> | §8.1, §12.1 | Cursor-based pagination | Not implemented. The feed loads the 200 newest items plus the user's saved items and returns the top 30; `nextCursor` is always `null`. |
+> | §12.2 | `201 / 200 / 409` submission responses | Returns `202 { submissionId, status: "queued" }`; the client polls `GET /api/submissions/[id]`. |
+> | §12.3, §17 | Vercel Cron triggers `/api/cron/ingest` | Supabase `pg_cron` + `pg_net` call `/api/cron/ingest` (5 min) and `/api/cron/process-links` (1 min) with a Vault-stored secret. |
+> | §10.1 | Nine core tables | Plus `content_events`, `user_interest_affinities`, `link_submissions`, and `private.ingestion_secrets`. |
+> | §14.1 | Feed, Saved, Add link, profile menu | Home, Library (saved), Profile, and Discover rail; sign-in/sign-up are Clerk-hosted rather than app routes. |
+> | §16 | `ENABLE_X_INGESTION` flag | Not read anywhere in the code. X automation is absent rather than flag-gated. |
+> | §18.2, §18.3 | Security and RLS test suites | Unit tests cover parsing, URL, ranking, classification, scheduler, and web-metadata behaviour. No automated SSRF-block, RLS, or browser tests exist. |
 
 ## 1. Executive Summary
 

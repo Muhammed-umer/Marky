@@ -76,10 +76,9 @@ export function engagementCountFromHtml(html: string): number {
   return counts.length ? Math.max(...counts) : 0;
 }
 
-interface ArticleMetadata { imageUrl: string | null; engagementCount: number; checkedAt: string }
+interface ArticleMetadata { imageUrl: string | null }
 
 async function fetchArticleMetadata(canonicalUrl: string): Promise<ArticleMetadata> {
-  const checkedAt = new Date().toISOString();
   try {
     const url = validateMediumArticleUrl(canonicalUrl);
     const response = await fetch(url, {
@@ -89,14 +88,14 @@ async function fetchArticleMetadata(canonicalUrl: string): Promise<ArticleMetada
       cache: "no-store",
     });
     if (response.url) validateMediumArticleUrl(response.url);
-    if (!response.ok) return { imageUrl: null, engagementCount: 0, checkedAt };
+    if (!response.ok) return { imageUrl: null };
     const contentLength = Number(response.headers.get("content-length") ?? 0);
-    if (contentLength > MAX_ARTICLE_BYTES) return { imageUrl: null, engagementCount: 0, checkedAt };
+    if (contentLength > MAX_ARTICLE_BYTES) return { imageUrl: null };
     const html = await response.text();
-    if (Buffer.byteLength(html, "utf8") > MAX_ARTICLE_BYTES) return { imageUrl: null, engagementCount: 0, checkedAt };
-    return { imageUrl: imageUrlFromHtml(html), engagementCount: engagementCountFromHtml(html), checkedAt };
+    if (Buffer.byteLength(html, "utf8") > MAX_ARTICLE_BYTES) return { imageUrl: null };
+    return { imageUrl: imageUrlFromHtml(html) };
   } catch {
-    return { imageUrl: null, engagementCount: 0, checkedAt };
+    return { imageUrl: null };
   }
 }
 
@@ -130,7 +129,12 @@ async function fetchFeed(source: MediumSource) {
 }
 
 export async function ingestMediumSource(supabase: SupabaseClient, source: MediumSource, interestRows: InterestRow[]): Promise<SourceResult> {
-  const { data: run, error: runError } = await supabase.from("ingestion_runs").insert({ source_id: source.id, status: "running" }).select("id").single();
+  const startedAt = new Date().toISOString();
+  const { data: run, error: runError } = await supabase
+    .from("ingestion_runs")
+    .insert({ source_id: source.id, status: "running", started_at: startedAt })
+    .select("id")
+    .single();
   if (runError || !run) return { sourceId: source.id, fetched: 0, inserted: 0, duplicates: 0, status: "failed", errorCode: "RUN_CREATE_FAILED" };
 
   try {
@@ -140,40 +144,39 @@ export async function ingestMediumSource(supabase: SupabaseClient, source: Mediu
 
     const recentCandidates = feed.candidates.filter((candidate) => isRecent(candidate.publishedAt)).slice(0, MAX_CANDIDATES_PER_SOURCE);
     const candidates = await Promise.all(recentCandidates.map(async (candidate) => ({ candidate, metadata: await fetchArticleMetadata(candidate.canonicalUrl) })));
-    candidates.sort((a, b) => b.metadata.engagementCount - a.metadata.engagementCount || Date.parse(b.candidate.publishedAt ?? "") - Date.parse(a.candidate.publishedAt ?? ""));
 
     for (const { candidate, metadata } of candidates) {
       const hash = urlHash(candidate.canonicalUrl);
       const imageUrl = candidate.imageUrl ?? metadata.imageUrl;
-      const { data: existing, error: lookupError } = await supabase.from("content_items").select("id,engagement_count").eq("url_hash", hash).maybeSingle();
+      const { data: existing, error: lookupError } = await supabase.from("content_items").select("id").eq("url_hash", hash).maybeSingle();
       if (lookupError) throw new Error("ITEM_LOOKUP_FAILED");
 
       let contentItemId = existing?.id as string | undefined;
       if (contentItemId) {
         duplicates += 1;
-        const engagementUpdate = { engagement_count: Math.max(Number(existing?.engagement_count ?? 0), metadata.engagementCount), engagement_checked_at: metadata.checkedAt };
         if (imageUrl) {
-          const { error: imageUpdateError } = await supabase.from("content_items").update({ image_url: imageUrl, ...engagementUpdate }).eq("id", contentItemId);
-          if (imageUpdateError) throw new Error("ITEM_IMAGE_UPDATE_FAILED");
-        } else {
-          const { error: engagementUpdateError } = await supabase.from("content_items").update(engagementUpdate).eq("id", contentItemId);
-          if (engagementUpdateError) throw new Error("ITEM_ENGAGEMENT_UPDATE_FAILED");
+          await supabase.from("content_items").update({ image_url: imageUrl, updated_at: new Date().toISOString() }).eq("id", contentItemId);
         }
       } else {
-        const { data: created, error: insertError } = await supabase.from("content_items").insert({
-          primary_source_id: source.id,
-          external_id: candidate.externalId,
-          canonical_url: candidate.canonicalUrl,
-          url_hash: hash,
-          title: candidate.title,
-          author: candidate.author,
-          summary: candidate.summary,
-          image_url: imageUrl,
-          engagement_count: metadata.engagementCount,
-          engagement_checked_at: metadata.checkedAt,
-          published_at: candidate.publishedAt,
-          publication_time_status: candidate.publishedAt ? "known" : "unknown",
-        }).select("id").single();
+        const { data: created, error: insertError } = await supabase
+          .from("content_items")
+          .insert({
+            source_id: source.id,
+            external_id: candidate.externalId,
+            canonical_url: candidate.canonicalUrl,
+            url_hash: hash,
+            title: candidate.title,
+            author: candidate.author,
+            summary: candidate.summary,
+            image_url: imageUrl,
+            published_at: candidate.publishedAt,
+            fetched_at: new Date().toISOString(),
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .select("id")
+          .single();
+
         if (insertError?.code === "23505") {
           const { data: raced } = await supabase.from("content_items").select("id").eq("url_hash", hash).single();
           contentItemId = raced?.id as string | undefined;
@@ -187,32 +190,51 @@ export async function ingestMediumSource(supabase: SupabaseClient, source: Mediu
       }
 
       if (!contentItemId) throw new Error("ITEM_ID_MISSING");
-      const { error: sourceLinkError } = await supabase.from("content_item_sources").upsert({ content_item_id: contentItemId, source_id: source.id }, { onConflict: "content_item_id,source_id", ignoreDuplicates: true });
-      if (sourceLinkError) throw new Error("SOURCE_LINK_FAILED");
 
       const matches = classifyContent(candidate.title, candidate.summary, source.name);
-      const interestLinks = matches.flatMap((match) => {
-        const row = interestRows.find((interest) => interest.name === match.name);
-        return row ? [{ content_item_id: contentItemId, interest_id: row.id, confidence: match.confidence }] : [];
+      const topicLinks = matches.flatMap((match) => {
+        const row = interestRows.find((topic) => topic.name === match.name);
+        return row ? [{ content_item_id: contentItemId, topic_id: row.id }] : [];
       });
-      if (interestLinks.length) {
-        const { error: interestError } = await supabase.from("content_item_interests").upsert(interestLinks, { onConflict: "content_item_id,interest_id" });
-        if (interestError) throw new Error("INTEREST_LINK_FAILED");
+      if (topicLinks.length) {
+        const { error: topicError } = await supabase.from("content_item_topics").upsert(topicLinks, { onConflict: "content_item_id,topic_id" });
+        if (topicError) throw new Error("TOPIC_LINK_FAILED");
       }
     }
 
     const finishedAt = new Date().toISOString();
     await Promise.all([
-      supabase.from("sources").update({ etag: feed.etag, last_modified: feed.lastModified, last_successful_fetch: finishedAt, last_error_code: null }).eq("id", source.id),
-      supabase.from("ingestion_runs").update({ status: "succeeded", finished_at: finishedAt, fetched_count: candidates.length, inserted_count: inserted, duplicate_count: duplicates, error_code: null }).eq("id", run.id),
+      supabase
+        .from("sources")
+        .update({
+          etag: feed.etag,
+          last_modified: feed.lastModified,
+          last_fetched_at: finishedAt,
+          last_success_at: finishedAt,
+          last_error: null,
+          updated_at: finishedAt,
+        })
+        .eq("id", source.id),
+      supabase
+        .from("ingestion_runs")
+        .update({
+          status: "succeeded",
+          completed_at: finishedAt,
+          items_seen: candidates.length,
+          items_inserted: inserted,
+          items_skipped: duplicates,
+          error_count: 0,
+          error_message: null,
+        })
+        .eq("id", run.id),
     ]);
     return { sourceId: source.id, fetched: candidates.length, inserted, duplicates, status: "succeeded" };
   } catch (error) {
     const code = errorCode(error);
     const finishedAt = new Date().toISOString();
     await Promise.all([
-      supabase.from("sources").update({ last_error_code: code }).eq("id", source.id),
-      supabase.from("ingestion_runs").update({ status: "failed", finished_at: finishedAt, error_code: code }).eq("id", run.id),
+      supabase.from("sources").update({ last_fetched_at: finishedAt, last_error: code, updated_at: finishedAt }).eq("id", source.id),
+      supabase.from("ingestion_runs").update({ status: "failed", completed_at: finishedAt, error_count: 1, error_message: code }).eq("id", run.id),
     ]);
     return { sourceId: source.id, fetched: 0, inserted: 0, duplicates: 0, status: "failed", errorCode: code };
   }

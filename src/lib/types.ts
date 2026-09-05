@@ -1,15 +1,21 @@
 export const interests = [
-  "Artificial Intelligence",
-  "Programming",
-  "Software Engineering",
-  "Cybersecurity",
-  "Startups",
-  "Cloud Computing",
-  "Data Science",
-  "Developer Tools",
+  "OpenAI",
+  "Hugging Face",
+  "NVIDIA",
+  "Google / Google DeepMind",
+  "Vercel",
+  "Supabase",
+  "Resend",
+  "Next.js",
+  "React",
+  "TypeScript",
+  "GitHub",
+  "Neon",
 ] as const;
 
 export type Interest = (typeof interests)[number];
+export const topics = interests;
+export type Topic = Interest;
 export type FeedView = "for-you" | "trending" | "latest";
 
 export interface FeedItem {

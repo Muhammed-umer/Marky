@@ -2,7 +2,6 @@ import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createAdminSupabaseClient } from "@/lib/supabase";
-import type { FeedItem } from "@/lib/types";
 
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
   const { userId } = await auth();
@@ -13,7 +12,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   if (!supabase) return NextResponse.json({ error: "Data service unavailable." }, { status: 503 });
   const { data: profile } = await supabase.from("profiles").select("id").eq("clerk_user_id", userId).single();
   if (!profile) return NextResponse.json({ error: "Submission not found." }, { status: 404 });
-  const { data, error } = await supabase.from("link_submissions").select("status,result_item,error_code").eq("id", id).eq("user_id", profile.id).single();
+  const { data, error } = await supabase.from("user_submissions").select("status,content_item_id,error_message").eq("id", id).eq("user_id", profile.id).single();
   if (error || !data) return NextResponse.json({ error: "Submission not found." }, { status: 404 });
-  return NextResponse.json({ status: data.status, item: data.result_item as FeedItem | null, errorCode: data.error_code });
+  return NextResponse.json({ status: data.status, item: null, errorCode: data.error_message });
 }

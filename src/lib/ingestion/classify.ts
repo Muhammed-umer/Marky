@@ -1,14 +1,18 @@
 import { interests, type Interest } from "@/lib/types";
 
 const keywords: Record<Interest, string[]> = {
-  "Artificial Intelligence": ["ai", "artificial intelligence", "machine learning", "llm", "model", "agent", "neural"],
-  Programming: ["programming", "developer", "javascript", "typescript", "python", "rust", "java", "code", "api"],
-  "Software Engineering": ["software engineering", "architecture", "testing", "reliability", "devops", "system design"],
-  Cybersecurity: ["security", "cybersecurity", "vulnerability", "malware", "privacy", "zero trust", "authentication"],
-  Startups: ["startup", "founder", "venture", "funding", "product market", "saas"],
-  "Cloud Computing": ["cloud", "aws", "azure", "gcp", "kubernetes", "serverless", "distributed"],
-  "Data Science": ["data science", "analytics", "statistics", "database", "data engineering", "warehouse"],
-  "Developer Tools": ["developer tools", "ide", "editor", "cli", "sdk", "git", "tooling"],
+  OpenAI: ["openai", "chatgpt", "gpt-", "codex", "sora"],
+  "Hugging Face": ["hugging face", "huggingface", "transformers", "spaces"],
+  NVIDIA: ["nvidia", "cuda", "geforce", "dgx"],
+  "Google / Google DeepMind": ["google", "deepmind", "gemini", "tensorflow"],
+  Vercel: ["vercel", "turbopack", "ai sdk"],
+  Supabase: ["supabase"],
+  Resend: ["resend"],
+  "Next.js": ["next.js", "nextjs"],
+  React: ["react", "reactjs"],
+  TypeScript: ["typescript", "tsconfig"],
+  GitHub: ["github", "github actions", "github copilot"],
+  Neon: ["neon", "neon postgres"],
 };
 
 export interface InterestMatch {
