@@ -14,15 +14,18 @@ export async function POST(request: Request) {
   try { submittedUrl = canonicalizeUrl(parsed.data.url); } catch {
     return NextResponse.json({ error: "Only safe HTTP and HTTPS links are accepted." }, { status: 400 });
   }
-  if (process.env.NEXT_PUBLIC_DEMO_MODE !== "false") {
+  if (process.env.NEXT_PUBLIC_DEMO_MODE === "true") {
     return NextResponse.json({ error: "Queued link processing requires live mode." }, { status: 503 });
   }
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
   const supabase = createAdminSupabaseClient();
   if (!supabase) return NextResponse.json({ error: "Data service unavailable." }, { status: 503 });
-  const { data: profile, error: profileError } = await supabase.from("profiles").upsert({ clerk_user_id: userId }, { onConflict: "clerk_user_id" }).select("id").single();
-  if (profileError || !profile) return NextResponse.json({ error: "Your Marky profile could not be loaded." }, { status: 502 });
+  const { data: profile, error: profileError } = await supabase.from("profiles").upsert({ clerk_user_id: userId, email: `${userId}@user.marky` }, { onConflict: "clerk_user_id" }).select("id").single();
+  if (profileError || !profile) {
+    console.error("[Submissions API] Failed to load/upsert profile:", profileError);
+    return NextResponse.json({ error: "Your Marky profile could not be loaded.", details: profileError?.message }, { status: 502 });
+  }
   try {
     const submissionId = await enqueueLinkSubmission(supabase, profile.id as string, submittedUrl, parsed.data.note);
     after(async () => {
@@ -30,7 +33,8 @@ export async function POST(request: Request) {
       if (worker) await processLinkQueue(worker, 1).catch(() => undefined);
     });
     return NextResponse.json({ submissionId, status: "queued" }, { status: 202 });
-  } catch {
+  } catch (err) {
+    console.error("[Submissions API] Error queueing link submission:", err);
     return NextResponse.json({ error: "The link could not be queued." }, { status: 502 });
   }
 }

@@ -1,14 +1,22 @@
 import { interests, type Interest } from "@/lib/types";
 
-const keywords: Record<Interest, string[]> = {
-  "Artificial Intelligence": ["ai", "artificial intelligence", "machine learning", "llm", "model", "agent", "neural"],
-  Programming: ["programming", "developer", "javascript", "typescript", "python", "rust", "java", "code", "api"],
-  "Software Engineering": ["software engineering", "architecture", "testing", "reliability", "devops", "system design"],
-  Cybersecurity: ["security", "cybersecurity", "vulnerability", "malware", "privacy", "zero trust", "authentication"],
-  Startups: ["startup", "founder", "venture", "funding", "product market", "saas"],
-  "Cloud Computing": ["cloud", "aws", "azure", "gcp", "kubernetes", "serverless", "distributed"],
-  "Data Science": ["data science", "analytics", "statistics", "database", "data engineering", "warehouse"],
-  "Developer Tools": ["developer tools", "ide", "editor", "cli", "sdk", "git", "tooling"],
+/**
+ * Shared with the feed's read-time relevance check, which has to recover which
+ * topic a stored item actually leads (see `src/lib/feed-relevance.ts`).
+ */
+export const interestKeywords: Record<Interest, string[]> = {
+  OpenAI: ["openai", "chatgpt", "gpt-", "codex", "sora"],
+  "Hugging Face": ["hugging face", "huggingface", "transformers", "spaces"],
+  NVIDIA: ["nvidia", "cuda", "geforce", "dgx"],
+  "Google / Google DeepMind": ["google", "deepmind", "gemini", "tensorflow"],
+  Vercel: ["vercel", "turbopack", "ai sdk"],
+  Supabase: ["supabase"],
+  Resend: ["resend"],
+  "Next.js": ["next.js", "nextjs"],
+  React: ["react", "reactjs"],
+  TypeScript: ["typescript", "tsconfig"],
+  GitHub: ["github", "github actions", "github copilot"],
+  Neon: ["neon", "neon postgres"],
 };
 
 export interface InterestMatch {
@@ -16,10 +24,16 @@ export interface InterestMatch {
   confidence: number;
 }
 
-export function classifyContent(title: string, summary: string | null, sourceName: string): InterestMatch[] {
-  const haystack = `${title} ${summary ?? ""} ${sourceName}`.toLowerCase();
+/**
+ * Matches on the content itself. The source name is deliberately excluded: it
+ * used to be part of the haystack, which tagged every "Google Blog" item with
+ * the Google topic regardless of subject. A source's own topics now come from
+ * the source_topics table instead.
+ */
+export function classifyContent(title: string, summary: string | null, bodyText: string | null = null): InterestMatch[] {
+  const haystack = `${title} ${summary ?? ""} ${bodyText ?? ""}`.toLowerCase();
   const matches = interests.flatMap((name) => {
-    const count = keywords[name].reduce((total, keyword) => total + (haystack.includes(keyword) ? 1 : 0), 0);
+    const count = interestKeywords[name].reduce((total, keyword) => total + (haystack.includes(keyword) ? 1 : 0), 0);
     if (!count) return [];
     return [{ name, confidence: Math.min(1, 0.55 + count * 0.15) }];
   });

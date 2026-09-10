@@ -12,8 +12,8 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
   return (
-    <html lang="en" data-scroll-behavior="smooth">
-      <body>{publishableKey ? <ClerkProvider publishableKey={publishableKey}>{children}</ClerkProvider> : children}</body>
+    <html lang="en" data-scroll-behavior="smooth" suppressHydrationWarning>
+      <body suppressHydrationWarning>{publishableKey ? <ClerkProvider publishableKey={publishableKey}>{children}</ClerkProvider> : children}</body>
     </html>
   );
 }

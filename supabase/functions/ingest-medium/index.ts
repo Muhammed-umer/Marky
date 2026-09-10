@@ -121,7 +121,9 @@ const topicRules: Record<string, string[]> = {
 
 Deno.serve(async (request: Request) => {
   if (request.method !== "POST") return new Response("Method not allowed", { status: 405 });
-  const url = Deno.env.get("SUPABASE_URL"); const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const url = Deno.env.get("SUPABASE_URL");
+  const secretKeys = Deno.env.get("SUPABASE_SECRET_KEYS");
+  const key = secretKeys ? (JSON.parse(secretKeys) as Record<string, string>).default : undefined;
   if (!url || !key) return Response.json({ error: "Service configuration unavailable" }, { status: 503 });
   const supabase = createClient(url, key, { auth: { persistSession: false } });
   const suppliedSecret = request.headers.get("x-cron-secret") ?? "";

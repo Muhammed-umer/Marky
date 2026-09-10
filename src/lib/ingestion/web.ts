@@ -1,5 +1,5 @@
 import "server-only";
-import { assertPublicHttpUrl } from "@/lib/ingestion/network";
+import { assertPublicHttpUrl, MARKY_USER_AGENT } from "@/lib/ingestion/network";
 import { parseWebMetadata, type WebMetadata } from "@/lib/ingestion/web-metadata";
 
 const FETCH_TIMEOUT_MS = 12_000;
@@ -10,7 +10,7 @@ export async function fetchWebMetadata(value: string): Promise<WebMetadata> {
   let url = await assertPublicHttpUrl(value);
   for (let redirect = 0; redirect <= MAX_REDIRECTS; redirect += 1) {
     const response = await fetch(url, {
-      headers: { Accept: "text/html,application/xhtml+xml;q=0.9" },
+      headers: { Accept: "text/html,application/xhtml+xml;q=0.9", "User-Agent": MARKY_USER_AGENT },
       redirect: "manual",
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       cache: "no-store",
