@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
 import { MarkyApp, PublicLanding } from "@/components/marky-app";
+import { demoItems } from "@/lib/demo-data";
 
 export const metadata: Metadata = {
   title: "Your Profile — Marky",
@@ -22,5 +23,5 @@ export default async function ProfilePage() {
     return <MarkyApp demoMode={demoMode} authEnabled={authEnabled} initialPage="profile" initialIsSignedIn={true} />;
   }
 
-  return <MarkyApp demoMode={demoMode} authEnabled={authEnabled} initialPage="profile" initialIsSignedIn={false} />;
+  return <MarkyApp demoMode={demoMode} authEnabled={authEnabled} initialPage="profile" initialItems={demoItems} initialIsSignedIn={false} />;
 }

@@ -73,19 +73,29 @@ async function loadItems(client: SupabaseClient, windowDays: number, limit: numb
   }));
 }
 
+export interface MergeResult {
+  savedItemsRepointed: number;
+  submissionsRepointed: number;
+  topicLinksMerged: number;
+  itemsRemoved: number;
+}
+
 /**
- * Moves every reference from the losing rows onto the keeper.
+ * Collapses `removeIds` into `keepId`: moves every reference from the losing
+ * rows onto the keeper, then deletes the losers. The one way a content item is
+ * ever merged away -- the near-duplicate sweep and the URL recanonicalisation
+ * both call this, so neither can forget a table the other remembers.
  *
  * Order matters. Each move is an upsert against the table's own uniqueness rule
  * -- a user who saved both copies, or a topic linked to both, must not fail the
  * merge -- and the delete only runs once nothing points at the losers except
  * the cascade itself.
  */
-async function mergeGroup(client: SupabaseClient, group: DuplicateGroup) {
-  const removeIds = group.remove.map((item) => item.id);
+export async function mergeContentItems(client: SupabaseClient, keepId: string, removeIds: string[]): Promise<MergeResult> {
   let savedItemsRepointed = 0;
   let submissionsRepointed = 0;
   let topicLinksMerged = 0;
+  if (!removeIds.length) return { savedItemsRepointed, submissionsRepointed, topicLinksMerged, itemsRemoved: 0 };
 
   const { data: topicRows, error: topicError } = await client
     .from("content_item_topics")
@@ -96,28 +106,42 @@ async function mergeGroup(client: SupabaseClient, group: DuplicateGroup) {
   if (topicIds.length) {
     const { error } = await client
       .from("content_item_topics")
-      .upsert(topicIds.map((topicId) => ({ content_item_id: group.keep.id, topic_id: topicId })), {
+      .upsert(topicIds.map((topicId) => ({ content_item_id: keepId, topic_id: topicId })), {
         onConflict: "content_item_id,topic_id",
       });
     if (error) throw new Error("DEDUPE_TOPIC_MERGE_FAILED");
     topicLinksMerged = topicIds.length;
   }
 
-  const { data: savedRows, error: savedError } = await client
+  type SavedRow = { content_item_id: string; user_id: string; is_read: boolean | null; saved_at: string | null };
+  const { data: losingRows, error: savedError } = await client
     .from("saved_items")
-    .select("user_id,is_read,saved_at")
+    .select("content_item_id,user_id,is_read,saved_at")
     .in("content_item_id", removeIds);
   if (savedError) throw new Error("DEDUPE_SAVED_READ_FAILED");
-  const saved = (savedRows ?? []) as Array<{ user_id: string; is_read: boolean | null; saved_at: string | null }>;
-  if (saved.length) {
+  const losingSaves = (losingRows ?? []) as SavedRow[];
+  if (losingSaves.length) {
+    // The keeper's own saves are read too, for just the readers involved: one
+    // who saved both copies and read only the keeper must not have that read
+    // state overwritten by the losing copy's `false`, nor their save re-dated
+    // to the later one. Scoped to those users so a well-saved keeper cannot
+    // push its rows past the response cap and out of the merge.
+    const affected = new Set(losingSaves.map((row) => row.user_id));
+    const { data: keeperRows, error: keeperError } = await client
+      .from("saved_items")
+      .select("content_item_id,user_id,is_read,saved_at")
+      .eq("content_item_id", keepId)
+      .in("user_id", [...affected]);
+    if (keeperError) throw new Error("DEDUPE_SAVED_READ_FAILED");
+
     // One row per user: the same story saved twice collapses to a single save,
     // read if either copy was read, dated from the earlier save.
     const byUser = new Map<string, { user_id: string; content_item_id: string; is_read: boolean; saved_at: string | null }>();
-    for (const row of saved) {
+    for (const row of [...losingSaves, ...((keeperRows ?? []) as SavedRow[])]) {
       const existing = byUser.get(row.user_id);
       const savedAt = row.saved_at ?? null;
       if (!existing) {
-        byUser.set(row.user_id, { user_id: row.user_id, content_item_id: group.keep.id, is_read: Boolean(row.is_read), saved_at: savedAt });
+        byUser.set(row.user_id, { user_id: row.user_id, content_item_id: keepId, is_read: Boolean(row.is_read), saved_at: savedAt });
         continue;
       }
       existing.is_read = existing.is_read || Boolean(row.is_read);
@@ -134,19 +158,51 @@ async function mergeGroup(client: SupabaseClient, group: DuplicateGroup) {
   }
 
   // ON DELETE SET NULL, so without this a submission would silently lose the
-  // article it produced.
+  // article it produced -- and the feed's exclusion list, which is keyed on
+  // it, would hand the reader's own link back to them on the dashboard.
   const { data: submissionRows, error: submissionError } = await client
     .from("user_submissions")
-    .update({ content_item_id: group.keep.id })
+    .update({ content_item_id: keepId })
     .in("content_item_id", removeIds)
     .select("id");
   if (submissionError) throw new Error("DEDUPE_SUBMISSION_MERGE_FAILED");
   submissionsRepointed = (submissionRows ?? []).length;
 
+  // content_item_signals is ON DELETE CASCADE too. The keeper takes the
+  // highest count seen on any copy -- the same "never lowered" rule
+  // recordSignals applies -- so a story Hacker News scored does not read as
+  // unseen because the publisher's copy happened to win the merge.
+  const { data: signalRows, error: signalError } = await client
+    .from("content_item_signals")
+    .select("content_item_id,engagement_count,source_count,platform,collected_at")
+    .in("content_item_id", [keepId, ...removeIds]);
+  if (signalError) throw new Error("DEDUPE_SIGNAL_READ_FAILED");
+  const signals = (signalRows ?? []) as Array<{
+    content_item_id: string; engagement_count: number | null; source_count: number | null; platform: string | null; collected_at: string | null;
+  }>;
+  if (signals.some((row) => row.content_item_id !== keepId)) {
+    const best = signals.reduce((top, row) => ((row.engagement_count ?? 0) > (top.engagement_count ?? 0) ? row : top));
+    const { error } = await client.from("content_item_signals").upsert(
+      {
+        content_item_id: keepId,
+        engagement_count: Math.max(...signals.map((row) => row.engagement_count ?? 0)),
+        source_count: Math.max(1, ...signals.map((row) => row.source_count ?? 1)),
+        platform: best.platform,
+        collected_at: best.collected_at ?? new Date().toISOString(),
+      },
+      { onConflict: "content_item_id" },
+    );
+    if (error) throw new Error("DEDUPE_SIGNAL_MERGE_FAILED");
+  }
+
   const { error: deleteError } = await client.from("content_items").delete().in("id", removeIds);
   if (deleteError) throw new Error("DEDUPE_DELETE_FAILED");
 
   return { savedItemsRepointed, submissionsRepointed, topicLinksMerged, itemsRemoved: removeIds.length };
+}
+
+function mergeGroup(client: SupabaseClient, group: DuplicateGroup) {
+  return mergeContentItems(client, group.keep.id, group.remove.map((item) => item.id));
 }
 
 export async function runDedupe(client: SupabaseClient, options: DedupeOptions = {}): Promise<DedupeReport> {

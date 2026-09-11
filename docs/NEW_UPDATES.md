@@ -31,6 +31,70 @@ Add a new section at the **top** of the log for every material change:
 
 Use the real calendar date of the change. If an entry is reconstructed later, say so in the title.
 
+## 2026-09-11 — Eleven fixes from the review of the pipeline rebuild
+
+A code review of commit 5eb512b found eleven bugs; all are fixed here. None changes product
+direction; two change what an operator sees (`/api/cron/backfill` reports) and one changes an
+API status code.
+
+### Fixed
+- **Duplicate-key collisions failed whole feed runs.** A row stored under Medium's old stamped
+  URL keeps its old `url_hash`, so the new clean hash missed it, the insert collided with the
+  `dedupe_key` index, and the hash-only fallback threw `ITEM_ID_MISSING` for the entire run.
+  `src/lib/ingestion/conflict.ts` now resolves a 23505 by hash *or* `dedupe_key`, rewrites the
+  found row to the clean URL so the next run matches by hash, and all three adapters skip the
+  item rather than failing the run when neither lookup finds it.
+- **Demo mode rendered the landing page with an empty feed.** The page shells stopped passing
+  `demoItems`, and the reader resolved to signed-out once auth loaded. Both restored.
+- **GitHub releases and YouTube videos were rejected as thin content.** The gate's
+  `kind` exemption existed only in tests; `DiscoveryAdapter.kind` now carries it, set to
+  `release` and `video` on those two adapters.
+- **`source_count` was fabricated.** Any already-stored item became "2 independent sources",
+  including one the same source stored an hour earlier. It now rises only when the stored row
+  came from a different source *and* the existing signal is from a different platform.
+- **The feed silently dropped items past PostgREST's 1000-row cap.** The topic-link query is now
+  windowed on `published_at` in the database and read in pages until a short one.
+- **Submitting a link that was already stored overwrote its image, body, author and date with
+  whatever the page fetch returned, nulls included.** The worker now only fills gaps (longer
+  body wins), so a feed article's publisher metadata survives a reader submitting it.
+- **Saving topics could leave a reader with none.** Delete-then-insert is now upsert-then-delete-
+  others, a selection matching no known topic is a 400, and `onboarded` is set only after the
+  selection is stored.
+- **A failed page fetch during backfill hid the article for good.** A row whose page could not be
+  fetched is stamped `backfilled_at` and reported as `extraction_failed` with a null score; only
+  a fetched page can be hidden.
+- **Submitted links appeared on the dashboard until reload.** The submission poller inserts the
+  finished item into the list only on the Saved page.
+- **`mode=recanonicalize` lost links when merging.** It re-pointed `saved_items` only;
+  `user_submissions` went `NULL` (so the reader's own link reappeared on their dashboard) and
+  topic links were dropped. Both tools now share `mergeContentItems` in `dedupe-store.ts`.
+- **Merging duplicates could reset read state.** The merge reads the keeper's own saves too, so
+  `is_read` is true if either copy was read and `saved_at` is the earlier of the two.
+
+A second review of these fixes found follow-ups, also in this entry:
+- The submission worker gained the same 23505 branch as the adapters, so submitting a URL whose
+  old-form copy is stored no longer fails the submission.
+- `source_count` also ignores rows with no `source_id` (reader submissions, deleted sources).
+- `mergeContentItems` merges `content_item_signals` too (highest count wins), and reads the
+  keeper's saves only for the readers involved, so a well-saved keeper cannot exceed the row cap.
+- The backfill still writes topic links for a row whose fetch failed; a legacy row with none was
+  otherwise unreachable by every feed view.
+- Body length in the submission merge is compared by character, not by the ASCII-only word
+  tokenizer, so a non-Latin submission is stored on first insert.
+- The feed pager stops on the exact link count and resumes from where the last page ended, so a
+  hosted max-rows below 1000 costs round trips rather than rows.
+- `mode=recanonicalize` counts a failed merge in `failed` and continues instead of aborting.
+- In demo mode, saving topics updates the tab's state instead of calling a route that needs auth.
+
+### Known limitations
+- The `dedupe_key` lookup in `conflict.ts` assumes migration `20260910010000` is applied. Before
+  that, a 23505 can only come from `url_hash`, which the first lookup handles.
+- Topic saving is still two statements, not one transaction; the ordering removes the empty
+  state but a delete failure leaves the union of old and new selections (reported as 502).
+- The backfill only treats a *thrown* fetch as a failure. A paywall or consent page served with
+  HTTP 200 is still scored on its teaser and can be hidden; distinguishing that from a genuinely
+  thin page needs a signal extraction does not yet produce.
+
 ## 2026-09-10 — Cleaning up what the gates were added too late to stop
 
 ### Added

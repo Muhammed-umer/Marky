@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { classifyContent } from "@/lib/ingestion/classify";
+import { resolveConflictingItem } from "@/lib/ingestion/conflict";
 import { mediumImageUrl, parseRssFeed } from "@/lib/ingestion/rss";
 import { qualifyCandidate } from "@/lib/qualification";
 import { isNearDuplicateTitle } from "@/lib/qualification/reject";
@@ -239,8 +240,9 @@ export async function ingestMediumSource(supabase: SupabaseClient, source: Mediu
           .single();
 
         if (insertError?.code === "23505") {
-          const { data: raced } = await supabase.from("content_items").select("id").eq("url_hash", hash).single();
-          contentItemId = raced?.id as string | undefined;
+          // A sibling run, or a row stored under the stamped URL whose
+          // dedupe_key matches the clean one. Either way it is stored.
+          contentItemId = await resolveConflictingItem(supabase, hash, candidate.canonicalUrl);
           duplicates += 1;
         } else if (insertError || !created) {
           throw new Error("ITEM_INSERT_FAILED");
@@ -250,7 +252,9 @@ export async function ingestMediumSource(supabase: SupabaseClient, source: Mediu
         }
       }
 
-      if (!contentItemId) throw new Error("ITEM_ID_MISSING");
+      // The collision proves the article is stored; not knowing which row is
+      // no reason to fail the rest of the feed.
+      if (!contentItemId) continue;
 
       const matches = classifyContent(candidate.title, candidate.summary, candidate.bodyText);
       const topicLinks = matches.flatMap((match) => {

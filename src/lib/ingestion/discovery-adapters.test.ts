@@ -245,3 +245,16 @@ describe("youtube", () => {
     expect(parseYouTubeFeed("<html><body>nope</body></html>")).toEqual([]);
   });
 });
+
+describe("adapter kinds", () => {
+  // The qualification gate exempts releases and videos from the substance bar
+  // and releases from staleness, but only when the candidate carries a kind.
+  // Nothing set one until the adapters did, so the exemptions only ever ran in
+  // the score tests while live releases were rejected as thin content.
+  it("scores GitHub releases as releases and YouTube uploads as videos", async () => {
+    const { githubReleasesAdapter } = await import("@/lib/ingestion/github-releases-source");
+    const { youtubeAdapter } = await import("@/lib/ingestion/youtube-source");
+    expect(githubReleasesAdapter.kind).toBe("release");
+    expect(youtubeAdapter.kind).toBe("video");
+  });
+});

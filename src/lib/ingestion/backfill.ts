@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { classifyContent } from "@/lib/ingestion/classify";
+import { mergeContentItems } from "@/lib/ingestion/dedupe-store";
 import { fetchWebMetadata } from "@/lib/ingestion/web";
 import { qualifyCandidate } from "@/lib/qualification";
 import { logQualification } from "@/lib/qualification/store";
@@ -45,6 +46,27 @@ interface ContentRow {
   source_id: string | null;
 }
 
+/**
+ * Re-runs classification against whatever text the row now has, plus the
+ * source's declared topics, and stops relying on the source name. Existing
+ * links are left in place; this only adds.
+ */
+async function linkTopics(client: SupabaseClient, row: ContentRow, sourceTopicIds: string[], bodyText: string | null) {
+  const keywordTopicNames = classifyContent(row.title, row.summary, bodyText).map((match) => match.name);
+  const wanted = [...sourceTopicIds];
+  if (keywordTopicNames.length) {
+    const { data: topicRows } = await client
+      .from("topics")
+      .select("id,name")
+      .in("name", keywordTopicNames.filter((name): name is Interest => interests.includes(name)));
+    for (const topic of topicRows ?? []) wanted.push(topic.id as string);
+  }
+  const links = [...new Set(wanted)].map((topicId) => ({ content_item_id: row.id, topic_id: topicId }));
+  if (links.length) {
+    await client.from("content_item_topics").upsert(links, { onConflict: "content_item_id,topic_id" });
+  }
+}
+
 /** 0.0-0.1, 0.1-0.2, ... so the shape of the gate is visible at a glance. */
 function bucket(score: number): string {
   const lower = Math.min(0.9, Math.floor(score * 10) / 10);
@@ -56,7 +78,8 @@ function bucket(score: number): string {
  * qualification gate existed. Resumable: every row it touches gets
  * backfilled_at, so a failed extraction is not retried forever, and rows that
  * fall below the threshold are hidden rather than deleted — deleting would
- * cascade away someone's saved_items row.
+ * cascade away someone's saved_items row. Only a row whose page was actually
+ * fetched can be hidden; a failed fetch is stamped and reported, not judged.
  */
 export async function runBackfill(
   client: SupabaseClient,
@@ -120,7 +143,39 @@ export async function runBackfill(
       report.extractionFailures += 1;
     }
 
+    report.processed += 1;
+
     const topicIds = row.source_id ? topicsBySource.get(row.source_id) ?? [] : [];
+
+    // A page that could not be fetched -- a 403, a timeout, a block -- would
+    // be scored on its teaser alone, and a teaser almost always fails
+    // substance. Hiding on that retires a real article for good, since the
+    // stamp below means the row is never looked at again. So the row is
+    // stamped (the sweep has to move on) and left exactly as visible as it
+    // was; the report says what happened. Topic links are still written from
+    // what is stored: a legacy row with none is reachable by no feed view, and
+    // this pass is its only chance to get them.
+    if (extractionFailed) {
+      report.items.push({
+        id: row.id,
+        title: row.title,
+        url: row.canonical_url,
+        imageFound: Boolean(row.image_url),
+        bodyWords: row.body_content ? row.body_content.split(/\s+/).filter(Boolean).length : 0,
+        score: null,
+        reason: "extraction_failed",
+        action: "extraction_failed",
+      });
+      if (dryRun) continue;
+      const { error: stampError } = await client
+        .from("content_items")
+        .update({ backfilled_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+        .eq("id", row.id);
+      if (stampError) throw new Error("BACKFILL_UPDATE_FAILED");
+      await linkTopics(client, row, topicIds, row.body_content);
+      continue;
+    }
+
     const scopedAliases = topicIds.length ? aliases.filter((alias) => topicIds.includes(alias.topic_id)) : aliases;
 
     const candidate: QualificationCandidate = {
@@ -139,7 +194,6 @@ export async function runBackfill(
     });
 
     const bodyWords = bodyText ? bodyText.split(/\s+/).filter(Boolean).length : 0;
-    report.processed += 1;
     report.scoreDistribution[bucket(verdict.score)] = (report.scoreDistribution[bucket(verdict.score)] ?? 0) + 1;
     if (imageUrl && !row.image_url) report.imagesAdded += 1;
     if (bodyText && !row.body_content) report.bodiesAdded += 1;
@@ -153,7 +207,7 @@ export async function runBackfill(
       bodyWords,
       score: verdict.score,
       reason: verdict.reason,
-      action: extractionFailed ? "extraction_failed" : verdict.accepted ? "kept" : "hidden",
+      action: verdict.accepted ? "kept" : "hidden",
     });
 
     if (dryRun) continue;
@@ -173,21 +227,7 @@ export async function runBackfill(
     await logQualification(client, candidate, verdict, urlHash(row.canonical_url), row.source_id, topicIds[0] ?? null)
       .catch(() => undefined);
 
-    // Re-run classification now that body text exists, and stop relying on the
-    // source name. Existing links are left in place; this only adds.
-    const keywordTopicNames = classifyContent(row.title, row.summary, bodyText).map((match) => match.name);
-    const wanted = [...new Set([...topicIds])];
-    if (keywordTopicNames.length) {
-      const { data: topicRows } = await client
-        .from("topics")
-        .select("id,name")
-        .in("name", keywordTopicNames.filter((name): name is Interest => interests.includes(name)));
-      for (const topic of topicRows ?? []) wanted.push(topic.id as string);
-    }
-    const links = [...new Set(wanted)].map((topicId) => ({ content_item_id: row.id, topic_id: topicId }));
-    if (links.length) {
-      await client.from("content_item_topics").upsert(links, { onConflict: "content_item_id,topic_id" });
-    }
+    await linkTopics(client, row, topicIds, bodyText);
   }
 
   const { count } = await client
@@ -205,6 +245,8 @@ export interface RecanonicalizeReport {
   rewritten: number;
   merged: number;
   savedRelinked: number;
+  /** Merges that threw and were left for the next run. */
+  failed: number;
   examples: Array<{ title: string; from: string; to: string; action: "rewritten" | "merged" }>;
 }
 
@@ -219,15 +261,15 @@ export interface RecanonicalizeReport {
  * forever. runBackfill re-scores content but never touched the URL, so its
  * sweeps left these in place.
  *
- * Merging keeps the richest row (image, then body, then oldest) and re-points
- * saved_items before deleting, because that foreign key is ON DELETE CASCADE
- * and would otherwise silently remove somebody's saved article.
+ * Merging keeps the richest row (image, then body, then oldest) and goes
+ * through mergeContentItems, so saves, submissions and topic links all move
+ * to the keeper before the delete.
  */
 export async function recanonicalizeContentUrls(
   client: SupabaseClient,
   { dryRun = true, limit = 2000 }: { dryRun?: boolean; limit?: number } = {},
 ): Promise<RecanonicalizeReport> {
-  const report: RecanonicalizeReport = { dryRun, scanned: 0, rewritten: 0, merged: 0, savedRelinked: 0, examples: [] };
+  const report: RecanonicalizeReport = { dryRun, scanned: 0, rewritten: 0, merged: 0, savedRelinked: 0, failed: 0, examples: [] };
 
   const { data, error } = await client
     .from("content_items")
@@ -280,18 +322,19 @@ export async function recanonicalizeContentUrls(
     if (isDuplicate) {
       report.merged += 1;
       if (dryRun) continue;
-      const { data: saves } = await client.from("saved_items").select("user_id").eq("content_item_id", row.id);
-      for (const save of saves ?? []) {
-        report.savedRelinked += 1;
-        // A conflict means that user already saved the keeper, so the cascade
-        // removing this row is the correct outcome.
-        await client
-          .from("saved_items")
-          .update({ content_item_id: keeper.id })
-          .eq("content_item_id", row.id)
-          .eq("user_id", save.user_id as string);
+      // The same merge the dedupe sweep runs: saves, submissions, topic links
+      // and signals all move to the keeper before the delete. Re-pointing
+      // saves alone left user_submissions ON DELETE SET NULL, which dropped
+      // the reader's link from the feed's exclusion list and put it back on
+      // their dashboard. One failed merge is counted, not fatal: the writes
+      // are idempotent and the next run picks the row up again.
+      try {
+        const merged = await mergeContentItems(client, keeper.id, [row.id]);
+        report.savedRelinked += merged.savedItemsRepointed;
+      } catch {
+        report.merged -= 1;
+        report.failed += 1;
       }
-      await client.from("content_items").delete().eq("id", row.id);
       continue;
     }
 

@@ -32,6 +32,9 @@ async function fetchHits(source: IngestionSource): Promise<DiscoveryHit[]> {
 export const youtubeAdapter: DiscoveryAdapter = {
   platform: "youtube",
   fetchHits,
+  // Scored as a video: the description is a caption for the artefact, so its
+  // length says nothing about substance.
+  kind: "video",
   // A YouTube watch page has no article to extract, and Readability on it
   // would return player chrome. The feed's description is what there is.
   enrichFromPage: false,

@@ -45,6 +45,9 @@ async function fetchHits(source: IngestionSource): Promise<DiscoveryHit[]> {
 export const githubReleasesAdapter: DiscoveryAdapter = {
   platform: "github",
   fetchHits,
+  // Scored as a release: "v16.0.1 -- bug fixes" is the whole note, not a thin
+  // article, and a release does not go stale.
+  kind: "release",
   // The release notes are the article. Fetching the release page would return
   // the same text wrapped in GitHub's chrome.
   enrichFromPage: false,

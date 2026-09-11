@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
 import { MarkyApp, PublicLanding } from "@/components/marky-app";
+import { demoItems } from "@/lib/demo-data";
 
 export const metadata: Metadata = {
   title: "Saved articles — Marky",
@@ -22,5 +23,5 @@ export default async function SavedPage() {
     return <MarkyApp demoMode={demoMode} authEnabled={authEnabled} initialPage="saved" initialIsSignedIn={true} />;
   }
 
-  return <MarkyApp demoMode={demoMode} authEnabled={authEnabled} initialPage="saved" initialIsSignedIn={false} />;
+  return <MarkyApp demoMode={demoMode} authEnabled={authEnabled} initialPage="saved" initialItems={demoItems} initialIsSignedIn={false} />;
 }

@@ -79,20 +79,39 @@ export async function POST(request: Request) {
     targetTopicIds = (matchedTopics ?? []).map((t) => t.id);
   }
 
-  // Delete previous user_topics for this profile
-  await admin.from("user_topics").delete().eq("user_id", profile.id);
-
-  // Insert new topic selections
-  if (targetTopicIds.length > 0) {
-    const insertRows = targetTopicIds.map((topicId) => ({
-      user_id: profile.id,
-      topic_id: topicId,
-    }));
-    const { error: insertError } = await admin.from("user_topics").insert(insertRows);
-    if (insertError) return NextResponse.json({ error: "Failed to persist topic preferences." }, { status: 502 });
+  // A selection that matches nothing is a bad request, not "follow nothing":
+  // an empty user_topics sends the reader back to onboarding.
+  if (targetTopicIds.length === 0) {
+    return NextResponse.json({ error: "Select at least one known topic." }, { status: 400 });
   }
 
-  // Update onboarded status in profiles
+  // Add the new selection first, then drop what it no longer contains. The two
+  // steps are not one transaction, so the order is what keeps a reader from
+  // ending up with no topics: if the insert fails (an unknown topicId, say)
+  // the old selection is untouched, and if the delete fails they hold the
+  // union rather than nothing.
+  const { error: upsertError } = await admin
+    .from("user_topics")
+    .upsert(
+      targetTopicIds.map((topicId) => ({ user_id: profile.id, topic_id: topicId })),
+      { onConflict: "user_id,topic_id", ignoreDuplicates: true },
+    );
+  if (upsertError) {
+    console.error("[User Topics API] Failed to insert user topics:", upsertError);
+    return NextResponse.json({ error: "Failed to persist topic preferences." }, { status: 502 });
+  }
+
+  const { error: deleteError } = await admin
+    .from("user_topics")
+    .delete()
+    .eq("user_id", profile.id)
+    .not("topic_id", "in", `(${targetTopicIds.join(",")})`);
+  if (deleteError) {
+    console.error("[User Topics API] Failed to remove deselected topics:", deleteError);
+    return NextResponse.json({ error: "Failed to persist topic preferences." }, { status: 502 });
+  }
+
+  // Onboarded only once a selection is actually stored.
   await admin.from("profiles").update({ onboarded: true, updated_at: new Date().toISOString() }).eq("id", profile.id);
 
   // Fetch updated topics

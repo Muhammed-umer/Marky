@@ -131,17 +131,40 @@ export async function GET(request: NextRequest) {
   const submittedItemIds = new Set((submittedRows ?? []).map((row) => row.content_item_id as string));
   const savedIds = [...savedByItem.keys()];
 
-  // 4. Query content items matching user's selected topics
-  const { data: topicItemRows, error: topicItemsError } = await admin
-    .from("content_item_topics")
-    .select("content_item_id")
-    .in("topic_id", selectedTopicIds);
-
-  if (topicItemsError) {
-    console.error("[Feed API] Error fetching content_item_topics:", topicItemsError);
+  // 4. Query content items matching user's selected topics, inside the view's
+  // window. PostgREST caps any response at the project's max-rows setting
+  // (1000 locally; a dashboard setting on the hosted project) and returns a
+  // truncated page with no error, so the links are read in pages until the
+  // exact count is reached. The next offset is wherever the last page really
+  // ended, so a cap below the page size only costs round trips, never rows.
+  // The window filter is pushed into the query so those pages stay few: For
+  // You needs three days of links, not the whole table. Unknown dates fall
+  // out here as well, which the filter below would have done anyway.
+  const recentCutoff = Date.now() - FEED_WINDOW_DAYS[view] * 86_400_000;
+  const TOPIC_LINK_PAGE = 1000;
+  const topicItemIds: string[] = [];
+  let expectedLinks = Number.POSITIVE_INFINITY;
+  let offset = 0;
+  while (offset < expectedLinks) {
+    const { data: page, count, error: topicItemsError } = await admin
+      .from("content_item_topics")
+      .select("content_item_id,content_items!inner(published_at)", { count: "exact" })
+      .in("topic_id", selectedTopicIds)
+      .gte("content_items.published_at", new Date(recentCutoff).toISOString())
+      .order("content_item_id")
+      .order("topic_id")
+      .range(offset, offset + TOPIC_LINK_PAGE - 1);
+    if (topicItemsError) {
+      console.error("[Feed API] Error fetching content_item_topics:", topicItemsError);
+      break;
+    }
+    const rows = page ?? [];
+    if (!rows.length) break;
+    for (const row of rows) topicItemIds.push(row.content_item_id as string);
+    expectedLinks = count ?? expectedLinks;
+    offset += rows.length;
   }
 
-  const topicItemIds = (topicItemRows ?? []).map((row) => row.content_item_id);
   const eligibleItemIds = [...new Set([...topicItemIds, ...savedIds])];
 
   console.log(`[Feed API] Eligible items: ${eligibleItemIds.length} (${topicItemIds.length} from topics, ${savedIds.length} saved)`);
@@ -205,7 +228,6 @@ export async function GET(request: NextRequest) {
     contentRows = chunkResults.flatMap((r) => (r.data ?? []) as unknown as ContentItemRow[]);
   }
 
-  const recentCutoff = Date.now() - FEED_WINDOW_DAYS[view] * 86_400_000;
   const items: FeedItem[] = (contentRows ?? []).filter((row) => {
     // Excluded before the saved-item exemption below, which would otherwise
     // pull every submitted link straight back into the dashboard.

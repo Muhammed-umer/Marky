@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { classifyContent } from "@/lib/ingestion/classify";
+import { resolveConflictingItem } from "@/lib/ingestion/conflict";
 import { mergeExtraction, needsEnrichment } from "@/lib/ingestion/enrich";
 import { reserveQuota, type QuotaPlatform } from "@/lib/ingestion/quota";
 import type { RssCandidate } from "@/lib/ingestion/rss";
@@ -9,7 +10,7 @@ import type { IngestionSource, InterestRow, SourceResult } from "@/lib/ingestion
 import { fetchWebMetadata } from "@/lib/ingestion/web";
 import { qualifyCandidate } from "@/lib/qualification";
 import { isNearDuplicateTitle } from "@/lib/qualification/reject";
-import type { EngagementPlatform } from "@/lib/qualification/types";
+import type { CandidateKind, EngagementPlatform } from "@/lib/qualification/types";
 import {
   loadRecentTitles,
   loadSourceQualificationContext,
@@ -60,6 +61,13 @@ export interface DiscoveryAdapter {
    * already returns the body -- a release note, a question, a description.
    */
   enrichFromPage: boolean;
+  /**
+   * What every hit from this platform is, when it is not an article. The
+   * qualification gate reads it: a release note or a video is the whole
+   * artefact, so its length says nothing about substance, and a release does
+   * not go stale. Left unset, hits are scored as articles.
+   */
+  kind?: CandidateKind;
   /** Set when the platform publishes a hard request limit worth tracking. */
   quota?: QuotaPlatform;
 }
@@ -69,10 +77,16 @@ function safeErrorCode(error: unknown) {
 }
 
 /**
- * source_count rises only when the item was already stored: the Discovery Map's
- * "the same URL seen on two platforms is one item with a higher source count".
- * It is the honest reading -- the publisher ran it and this platform carried
- * it, so two independent sources have it.
+ * source_count rises only when the item was stored by somebody else: the
+ * Discovery Map's "the same URL seen on two platforms is one item with a higher
+ * source count". The publisher ran it and this platform carried it, so two
+ * independent sources have it.
+ *
+ * "Somebody else" is checked twice, because both halves have been wrong. The
+ * row's source_id must differ -- this same source re-seeing its own hit an
+ * hour later is not a second source -- and the signals row must not already
+ * come from this platform, since two Hacker News queries finding one story are
+ * still one platform. Anything looser is a fabricated signal feeding Trending.
  *
  * A recorded count is never lowered. A later search can return a smaller page
  * of the same story, and Trending reading a number that fell for no reason
@@ -83,25 +97,27 @@ async function recordSignals(
   contentItemId: string,
   hit: DiscoveryHit,
   platform: EngagementPlatform,
-  alreadyStored: boolean,
+  storedByAnotherSource: boolean,
 ) {
   const reported = hit.signalCount ?? hit.engagementCount;
   if (reported == null) return;
 
   const { data: current } = await client
     .from("content_item_signals")
-    .select("engagement_count,source_count")
+    .select("engagement_count,source_count,platform")
     .eq("content_item_id", contentItemId)
     .maybeSingle();
 
   const existingCount = (current?.engagement_count as number | undefined) ?? 0;
   const existingSources = (current?.source_count as number | undefined) ?? 1;
+  const samePlatform = (current?.platform as string | null | undefined) === platform;
+  const independent = storedByAnotherSource && !samePlatform;
 
   await client.from("content_item_signals").upsert(
     {
       content_item_id: contentItemId,
       engagement_count: Math.max(Math.max(0, Math.floor(reported)), existingCount),
-      source_count: Math.max(existingSources, alreadyStored ? 2 : 1),
+      source_count: Math.max(existingSources, independent ? 2 : 1),
       platform,
       collected_at: new Date().toISOString(),
     },
@@ -154,17 +170,26 @@ export async function runDiscoverySource(
     const hashes = entries.map((entry) => urlHash(entry.candidate.canonicalUrl));
     const { data: existingRows, error: lookupError } = await supabase
       .from("content_items")
-      .select("id,url_hash")
+      .select("id,url_hash,source_id")
       .in("url_hash", hashes);
     if (lookupError) throw new Error("ITEM_LOOKUP_FAILED");
-    const existingByHash = new Map((existingRows ?? []).map((row) => [row.url_hash as string, row.id as string]));
+    const existingByHash = new Map(
+      (existingRows ?? []).map((row) => [row.url_hash as string, { id: row.id as string, sourceId: row.source_id as string | null }]),
+    );
 
-    const prepared = entries.map((entry, index) => ({
-      hit: entry,
-      candidate: entry.candidate,
-      hash: hashes[index],
-      existingId: existingByHash.get(hashes[index]),
-    }));
+    const prepared = entries.map((entry, index) => {
+      const existing = existingByHash.get(hashes[index]);
+      return {
+        hit: entry,
+        candidate: entry.candidate,
+        hash: hashes[index],
+        existingId: existing?.id,
+        // This source re-seeing its own hit on a later run is not a second
+        // source, and a row with no source at all (a reader's submission, or
+        // one whose source was deleted) is not one either; see recordSignals.
+        storedByAnotherSource: existing?.sourceId != null && existing.sourceId !== source.id,
+      };
+    });
 
     if (adapter.enrichFromPage) {
       const toEnrich = prepared
@@ -195,6 +220,7 @@ export async function runDiscoverySource(
           bodyText: candidate.bodyText,
           canonicalUrl: candidate.canonicalUrl,
           publishedAt: candidate.publishedAt,
+          kind: adapter.kind,
           engagementCount: hit.engagementCount,
           platform: adapter.platform,
         },
@@ -230,7 +256,7 @@ export async function runDiscoverySource(
       }
     }
 
-    for (const { hit, candidate, hash, existingId } of prepared) {
+    for (const { hit, candidate, hash, existingId, storedByAnotherSource } of prepared) {
       let contentItemId = existingId;
 
       if (contentItemId) {
@@ -261,8 +287,9 @@ export async function runDiscoverySource(
           .single();
 
         if (error?.code === "23505") {
-          const { data: raced } = await supabase.from("content_items").select("id").eq("url_hash", hash).single();
-          contentItemId = raced?.id as string | undefined;
+          // A sibling run, or a row stored under an older URL form whose
+          // dedupe_key matches. Either way it is stored; see conflict.ts.
+          contentItemId = await resolveConflictingItem(supabase, hash, candidate.canonicalUrl);
           duplicates += 1;
         } else if (error || !created) {
           throw new Error("ITEM_INSERT_FAILED");
@@ -273,7 +300,7 @@ export async function runDiscoverySource(
       }
 
       if (!contentItemId) continue;
-      await recordSignals(supabase, contentItemId, hit, adapter.platform, Boolean(existingId));
+      await recordSignals(supabase, contentItemId, hit, adapter.platform, storedByAnotherSource);
 
       const keywordTopicIds = classifyContent(candidate.title, candidate.summary, candidate.bodyText).flatMap((match) => {
         const topic = interests.find((row) => row.name === match.name);

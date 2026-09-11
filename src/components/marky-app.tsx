@@ -724,6 +724,15 @@ function MarkyExperience({
       setNotice("Please select at least one topic.");
       return;
     }
+    // No profile to write to in demo mode; the selection lives in this tab.
+    if (demoMode) {
+      setUserTopics(topicNames);
+      setSelectedTopicDraft(topicNames);
+      setNeedsOnboarding(false);
+      setEditingTopics(false);
+      setNotice("Topic preferences updated for this demo session.");
+      return;
+    }
     setSavingTopics(true);
     try {
       const response = await fetch("/api/user/topics", {
@@ -767,7 +776,12 @@ function MarkyExperience({
         );
         for (const result of statuses) {
           if (result.status === "completed" && result.item) {
-            setItems((current) => [result.item!, ...current.filter((item) => item.id !== result.item!.id && item.url !== result.item!.url)]);
+            // A submitted link belongs in Saved and nowhere else (see the feed
+            // route's exclusion), so only the library shows it in place; the
+            // dashboard gets the notice.
+            if (initialPage === "saved") {
+              setItems((current) => [result.item!, ...current.filter((item) => item.id !== result.item!.id && item.url !== result.item!.url)]);
+            }
             setPendingSubmissionIds((current) => current.filter((id) => id !== result.id));
             setNotice(`“${result.item.title}” was added to Saved.`);
           } else if (result.status === "failed") {
@@ -782,7 +796,7 @@ function MarkyExperience({
     void checkSubmissions();
     const interval = window.setInterval(() => void checkSubmissions(), 2_000);
     return () => window.clearInterval(interval);
-  }, [demoMode, pendingSubmissionIds]);
+  }, [demoMode, initialPage, pendingSubmissionIds]);
 
   const visible = useMemo(() => {
     const selected = interest === "All Interests" ? (userTopics.length ? userTopics as Interest[] : (["OpenAI", "Next.js", "Supabase"] as Interest[])) : [interest];
@@ -921,7 +935,10 @@ function MarkyExperience({
     );
   };
 
-  const effectiveIsSignedIn = authLoaded ? isSignedIn : (isSignedIn || initialIsSignedIn || demoMode);
+  // Demo mode has no reader to sign in: the bundled items are the reader.
+  // Without this, a demo deployment with no Clerk keys resolves to signed-out
+  // once auth "loads" and shows the landing page instead of the reader.
+  const effectiveIsSignedIn = demoMode || (authLoaded ? isSignedIn : (isSignedIn || initialIsSignedIn));
 
   if (!effectiveIsSignedIn) {
     return <PublicLanding authEnabled={authEnabled} />;

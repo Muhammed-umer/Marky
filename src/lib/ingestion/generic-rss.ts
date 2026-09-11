@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { classifyContent } from "@/lib/ingestion/classify";
+import { resolveConflictingItem } from "@/lib/ingestion/conflict";
 import { qualifyCandidate } from "@/lib/qualification";
 import { loadRecentTitles, loadSourceQualificationContext, logQualificationBatch, type QualificationLogEntry } from "@/lib/qualification/store";
 import { isNearDuplicateTitle } from "@/lib/qualification/reject";
@@ -203,8 +204,9 @@ export async function ingestGenericRssSource(supabase: SupabaseClient, source: I
           .single();
 
         if (error?.code === "23505") {
-          const { data: raced } = await supabase.from("content_items").select("id").eq("url_hash", hash).single();
-          contentItemId = raced?.id as string | undefined;
+          // A sibling run, or a row stored under the old URL form whose
+          // dedupe_key matches. Either way it is stored; see conflict.ts.
+          contentItemId = await resolveConflictingItem(supabase, hash, candidate.canonicalUrl);
           duplicates += 1;
         } else if (error || !created) {
           throw new Error("ITEM_INSERT_FAILED");
@@ -214,7 +216,9 @@ export async function ingestGenericRssSource(supabase: SupabaseClient, source: I
         }
       }
 
-      if (!contentItemId) throw new Error("ITEM_ID_MISSING");
+      // The collision proves the article is stored; not knowing which row is
+      // no reason to fail the other nineteen.
+      if (!contentItemId) continue;
 
       const keywordTopicIds = classifyContent(candidate.title, candidate.summary, candidate.bodyText).flatMap((match) => {
         const topic = interests.find((row) => row.name === match.name);
