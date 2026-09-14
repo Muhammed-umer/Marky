@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mergeExtraction, needsEnrichment } from "@/lib/ingestion/enrich";
+import { enrichBatch, mergeExtraction, needsEnrichment } from "@/lib/ingestion/enrich";
 import type { RssCandidate } from "@/lib/ingestion/rss";
 import type { WebMetadata } from "@/lib/ingestion/web-metadata";
 
@@ -71,5 +71,31 @@ describe("mergeExtraction", () => {
     expect(merged.author).toBeNull();
     expect(merged.imageUrl).toBeNull();
     expect(merged.summary).toBeNull();
+  });
+});
+
+describe("enrichBatch", () => {
+  it("merges successful fetches in place and counts failures by host and code, never by URL", async () => {
+    const entries = [
+      { candidate: candidate({ canonicalUrl: "https://medium.com/@a/one", imageUrl: null }) },
+      { candidate: candidate({ canonicalUrl: "https://medium.com/@b/two", imageUrl: null }) },
+      { candidate: candidate({ canonicalUrl: "https://huggingface.co/blog/three", imageUrl: null }) },
+    ];
+    const fetchPage = async (url: string) => {
+      if (url.startsWith("https://medium.com")) throw new Error("HTTP_403");
+      return metadata({ canonicalUrl: url });
+    };
+    const report = await enrichBatch(entries, fetchPage, 2);
+    expect(report).toEqual({ attempted: 3, enriched: 1, failed: 2, failures: { "medium.com:HTTP_403": 2 } });
+    expect(entries[2].candidate.imageUrl).toBe("https://miro.medium.com/og.jpg");
+    // Failed entries keep the feed's version untouched.
+    expect(entries[0].candidate.imageUrl).toBeNull();
+    expect(JSON.stringify(report)).not.toContain("/@a/one");
+  });
+
+  it("never throws, and maps an unexpected error to a generic code", async () => {
+    const entries = [{ candidate: candidate({ canonicalUrl: "https://example.com/p" }) }];
+    const report = await enrichBatch(entries, async () => { throw new TypeError("socket hang up"); }, 1);
+    expect(report.failures).toEqual({ "example.com:FETCH_FAILED": 1 });
   });
 });

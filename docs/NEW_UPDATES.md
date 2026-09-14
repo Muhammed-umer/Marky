@@ -31,6 +31,120 @@ Add a new section at the **top** of the log for every material change:
 
 Use the real calendar date of the change. If an entry is reconstructed later, say so in the title.
 
+## 2026-09-14 — Latin-script language gate and key points on cards
+
+### Added
+- **Key points on every card that has a body.** `GET /api/feed` attaches `keyPoints` (three to
+  five sentences, verbatim from `body_content`, chosen by the existing extractive
+  `keyPoints` in `src/lib/summarize.ts`) to the fifty items of the page being returned, via one
+  extra query for those ids only. Cards show them under a closed "Key points" disclosure; the
+  brief shows the same list at once instead of waiting for the article to load. Items with no
+  stored body get no points; nothing is generated. `GET /api/submissions/[id]` attaches them
+  to a just-completed link for the same reason. No AI model is involved anywhere in Marky.
+
+### Changed
+- `isLikelyNonEnglish` now judges Latin-script text that is too short for the stopword ratio
+  (which needs 40 words). Two new stages sit between the script test and the ratio: a count of
+  function words from Indonesian/Malay, Spanish, Portuguese, French, German, Italian, Dutch,
+  Turkish, Vietnamese, Tagalog, Polish, Romanian, Czech, Hungarian and the Nordic languages
+  against English ones (two distinct foreign words and a majority on the title alone, three
+  on the whole text), and a diacritic density test for Vietnamese. Words that are also English
+  words, names or acronyms ("Dan", "Red Hat", "Jest", "per", "non", "os", "com") are excluded so
+  an English title can never be flagged by a name. Run against the live table 2026-09-14:
+  905 scanned, 10 flagged (Indonesian ×6, Italian, Spanish, Chinese, one Malay), 10 removed,
+  0 retained, 0 English rows flagged.
+
+### Fixed
+- **The production cron target was running code from 2026-09-05.** The `marky_cron_url` Vault
+  secret points at the Vercel production deployment, whose last production build was commit
+  1888833; every commit since (the pipeline rebuild, the eleven-bug fix) had only Preview
+  deployments because `main` was never pushed. 343 of the last 1,000 ingestion runs failed with
+  `ITEM_ID_MISSING`, an error that no longer exists in the code. Pushed `main` on 2026-09-14 so
+  production rebuilds from it.
+- `POST /api/cron/ingest` now closes runs left in `running` for more than 30 minutes as
+  `failed` / `TIMED_OUT` before starting new ones. The platform kills a function at
+  `maxDuration` without letting it write its failure row; 60 such rows were closed on the
+  first pass.
+- Feed adapters look new entries up by `dedupe_key` as well as `url_hash`. A Medium post stored
+  under the stamped `?source=rss----` URL was missed by the hash lookup, scored again on every
+  run, and rejected as a near-duplicate of itself: 51 of 57 verdicts in one pass. It is now
+  counted as the duplicate it is.
+- Discovery fetches follow same-host redirects (re-checked by the SSRF guard, off-host
+  refused). GitHub answers 301 for a renamed repository, which failed the React releases source
+  on every run.
+- Page-fetch outcomes are now reported: each run returns `enriched`, `enrichmentFailed` and
+  `enrichmentFailures` keyed `host:CODE` (never a URL), and logs them, so a publisher that
+  starts refusing the extractor is visible instead of silent.
+- First full pass with current code against the live project (through the local server,
+  2026-09-14): 39 sources, 130 fetched, 63 inserted (35 Hacker News, 18 GitHub releases,
+  10 DEV.to), 70 pages enriched, 9 refused (Reuters, Bloomberg, WSJ, Economist paywalls), 0
+  ingestion failures after the redirect fix. Bodies are being stored again.
+
+### Known limitations
+- **Medium.** Medium's Cloudflare answers Node's `fetch` with HTTP 403 whatever the headers
+  (the same URL and User-Agent return 200 from curl, so it is a TLS client fingerprint block,
+  not a header we can set), and Medium tag feeds carry no `content:encoded`. Not worked
+  around: bypassing a bot-management block is not something the extractor should do. With
+  current code a teaser-only Medium post scores 0.59 and is rejected as thin, so the six
+  Medium tag sources will contribute little until Medium allows extraction. Deactivating them
+  is a product decision, not taken here.
+- One `PGRST303` (JWT expired) from PostgREST was seen on a single request and passed on
+  retry; worth watching in the Vercel function log.
+- Key points are extractive: a heading glued to the next sentence by the extractor can appear
+  as the start of a point.
+
+## 2026-09-14 — Server-side search, paging, English-only reads, and reader UI pass
+
+### Added
+- `GET /api/feed` accepts `q` (search), `cursor` (offset into the ranked list) and, for the
+  library, `tab=links|posts`. Pages are 50 items; the response carries `nextCursor` (null at
+  the end) and `total`. Search runs on the server over the whole eligible window (365 days
+  regardless of view), so a match beyond the loaded page is found.
+- The dashboard loads the next page as the reader scrolls (a sentinel below the list; a
+  "Load more" button is the fallback), and debounces search keystrokes before asking the server.
+- Saved page is split into **Links** (URLs the reader pasted) and **Posts** (stories they
+  bookmarked). `FeedItem.isSubmittedLink` carries the distinction to the browser.
+- Desktop sidebar can be collapsed to an icon rail from a bars-to-X toggle at its top right;
+  the choice is remembered per browser. Collapsing never hides Home / Saved / Profile, and the
+  header (wordmark, search, actions) is independent of the sidebar width.
+- `GET /api/user/stats` returns saved links, saved posts, read count and topics followed for
+  the profile page, read from the ownership tables; the feed could not supply these because it
+  hides the reader's own submissions and only reaches back a few days.
+- Search with no matches shows a dedicated empty state with a Clear search action; a search or
+  tab change keeps the current list on screen ("Searching…") instead of replacing it with the
+  skeleton, which is reserved for the first load.
+
+### Changed
+- The feed applies the ingestion language gate on the way out as well (`isLikelyNonEnglish`
+  over title + summary), exempting saved and submitted items. Rows that predate the gate can
+  no longer reach a reader even before a purge runs.
+- Wordmark is "Marky" everywhere and links to Home; header/landing/footer casing unified.
+- Right-rail "Add an article link" button removed (header and page-heading buttons remain).
+- Duplicate "Your topics" block removed from the left nav; the topic dialog gained
+  Select all / Deselect all.
+- Mobile menu and drawer switch at the same width (834px); previously the button showed
+  from 1024px while the drawer only existed below 760px. The drawer closes itself if the
+  window is widened past that point, so body scroll is not left locked.
+- Removed the hardcoded fallback topics (OpenAI, Next.js, Supabase) that demo ranking used when
+  a reader had selected none, along with the dead `interest` filter state that carried them.
+- Profile "Edit topics" button had no styles at all (its class was never defined) and rendered
+  as a browser default; it is now the shared secondary button.
+
+### Fixed
+- `globals.css` still shipped an earlier red-accented design system whose class names
+  (`.modal`, `.toast`, `.empty-state`, `.story-actions`, `.primary-button`, bare `main`)
+  collided with the live stylesheet and could leak a red hover depending on bundle order.
+  Reduced to the reset plus the two fallback screens that use it.
+- Language purge (`/api/cron/purge-language`) failed with `PURGE_OWNERSHIP_READ_FAILED` on a
+  full-table scan: the ownership lookup and the delete now run in 80-id chunks. Run on the
+  live project 2026-09-14: 923 scanned, 21 non-English rows removed, 0 retained.
+
+### Known limitations
+- Search is a substring match over title, summary, author and source, applied after the
+  topic-eligible rows are loaded; it is not a database full-text index.
+- The cursor is an offset into a ranking recomputed per request, so an item that changes
+  rank between two pages can appear twice or be skipped; the client dedupes by id.
+
 ## 2026-09-11 — Eleven fixes from the review of the pipeline rebuild
 
 A code review of commit 5eb512b found eleven bugs; all are fixed here. None changes product

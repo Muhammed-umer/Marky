@@ -2,10 +2,9 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { classifyContent } from "@/lib/ingestion/classify";
 import { resolveConflictingItem } from "@/lib/ingestion/conflict";
-import { mergeExtraction, needsEnrichment } from "@/lib/ingestion/enrich";
+import { enrichBatch, needsEnrichment, type EnrichmentReport } from "@/lib/ingestion/enrich";
 import { reserveQuota, type QuotaPlatform } from "@/lib/ingestion/quota";
 import type { RssCandidate } from "@/lib/ingestion/rss";
-import { runWithConcurrency } from "@/lib/ingestion/scheduler";
 import type { IngestionSource, InterestRow, SourceResult } from "@/lib/ingestion/types";
 import { fetchWebMetadata } from "@/lib/ingestion/web";
 import { qualifyCandidate } from "@/lib/qualification";
@@ -191,18 +190,16 @@ export async function runDiscoverySource(
       };
     });
 
+    // Paywalls and blocks are ordinary here: a failed fetch keeps what the
+    // platform reported, the gate judges that, and the verdict log records why.
+    // The run's result still counts the failures so a host that starts
+    // refusing every fetch is visible.
+    let enrichment: EnrichmentReport = { attempted: 0, enriched: 0, failed: 0, failures: {} };
     if (adapter.enrichFromPage) {
       const toEnrich = prepared
         .filter((entry) => !entry.existingId && needsEnrichment(entry.candidate))
         .slice(0, MAX_ENRICHMENTS_PER_RUN);
-      await runWithConcurrency(toEnrich, ENRICH_CONCURRENCY, async (entry) => {
-        try {
-          entry.candidate = mergeExtraction(entry.candidate, await fetchWebMetadata(entry.candidate.canonicalUrl));
-        } catch {
-          // Paywalls and blocks are ordinary here. The gate then judges what
-          // little is known, and the verdict log records why.
-        }
-      });
+      enrichment = await enrichBatch(toEnrich, fetchWebMetadata, ENRICH_CONCURRENCY);
     }
 
     // Sequential: near-duplicate detection measures each title against the ones
@@ -333,7 +330,17 @@ export async function runDiscoverySource(
       }).eq("id", run.id),
     ]);
 
-    return { sourceId: source.id, fetched: prepared.length, inserted, duplicates, rejected, status: "succeeded" };
+    return {
+      sourceId: source.id,
+      fetched: prepared.length,
+      inserted,
+      duplicates,
+      rejected,
+      status: "succeeded",
+      enriched: enrichment.enriched,
+      enrichmentFailed: enrichment.failed,
+      enrichmentFailures: enrichment.failures,
+    };
   } catch (error) {
     const errorCode = safeErrorCode(error);
     const finishedAt = new Date().toISOString();

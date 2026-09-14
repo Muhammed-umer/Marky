@@ -4,10 +4,9 @@ import { resolveConflictingItem } from "@/lib/ingestion/conflict";
 import { qualifyCandidate } from "@/lib/qualification";
 import { loadRecentTitles, loadSourceQualificationContext, logQualificationBatch, type QualificationLogEntry } from "@/lib/qualification/store";
 import { isNearDuplicateTitle } from "@/lib/qualification/reject";
-import { mergeExtraction, needsEnrichment } from "@/lib/ingestion/enrich";
+import { enrichBatch, needsEnrichment, type EnrichmentReport } from "@/lib/ingestion/enrich";
 import { assertPublicHttpUrl, MARKY_USER_AGENT } from "@/lib/ingestion/network";
 import { parseRssFeed } from "@/lib/ingestion/rss";
-import { runWithConcurrency } from "@/lib/ingestion/scheduler";
 import type { IngestionSource, InterestRow, SourceResult } from "@/lib/ingestion/types";
 import { fetchWebMetadata } from "@/lib/ingestion/web";
 import { urlHash } from "@/lib/url";
@@ -91,17 +90,28 @@ export async function ingestGenericRssSource(supabase: SupabaseClient, source: I
     // Pass 1: which entries are new. One query for the whole batch rather than
     // one per candidate -- a feed offering 20 already-stored items used to cost
     // 20 sequential round trips (~18s observed) to learn nothing.
+    //
+    // Looked up by `dedupe_key` as well as by hash. A row stored under Medium's
+    // stamped URL form keeps its old hash, so the hash lookup misses it; the
+    // key, derived by the database from the clean URL, finds it. Without this
+    // every such post was scored again on every run and rejected as a
+    // near-duplicate of itself -- 51 of 57 verdicts logged on 2026-09-14 --
+    // instead of being counted as the duplicate it is.
     const hashes = candidates.map((candidate) => urlHash(candidate.canonicalUrl));
-    const { data: existingRows, error: lookupError } = await supabase
-      .from("content_items")
-      .select("id,url_hash")
-      .in("url_hash", hashes);
+    const [{ data: existingRows, error: lookupError }, { data: keyRows, error: keyError }] = await Promise.all([
+      supabase.from("content_items").select("id,url_hash").in("url_hash", hashes),
+      supabase.from("content_items").select("id,dedupe_key").in("dedupe_key", candidates.map((candidate) => candidate.canonicalUrl)),
+    ]);
     if (lookupError) throw new Error("ITEM_LOOKUP_FAILED");
+    // The key lookup is a refinement, not a requirement: a database without the
+    // column yet still ingests, and the insert collision path covers the gap.
+    if (keyError) console.warn(`[Ingestion] dedupe_key lookup failed for source ${source.id}: ${keyError.message}`);
     const existingByHash = new Map((existingRows ?? []).map((row) => [row.url_hash as string, row.id as string]));
+    const existingByKey = new Map((keyRows ?? []).map((row) => [row.dedupe_key as string, row.id as string]));
     const prepared = candidates.map((candidate, index) => ({
       candidate,
       hash: hashes[index],
-      existingId: existingByHash.get(hashes[index]),
+      existingId: existingByHash.get(hashes[index]) ?? existingByKey.get(candidate.canonicalUrl),
     }));
 
     // Pass 2: fetch the source page for new entries the feed under-described
@@ -112,13 +122,7 @@ export async function ingestGenericRssSource(supabase: SupabaseClient, source: I
     const toEnrich = prepared
       .filter((entry) => !entry.existingId && needsEnrichment(entry.candidate))
       .slice(0, MAX_ENRICHMENTS_PER_RUN);
-    await runWithConcurrency(toEnrich, ENRICH_CONCURRENCY, async (entry) => {
-      try {
-        entry.candidate = mergeExtraction(entry.candidate, await fetchWebMetadata(entry.candidate.canonicalUrl));
-      } catch {
-        // The feed entry stands, and the qualification log records what it scored.
-      }
-    });
+    const enrichment: EnrichmentReport = await enrichBatch(toEnrich, fetchWebMetadata, ENRICH_CONCURRENCY);
 
     // Pass 3: score every new candidate. Pure and sequential -- sequential
     // because near-duplicate detection measures each title against the ones
@@ -258,7 +262,17 @@ export async function ingestGenericRssSource(supabase: SupabaseClient, source: I
         })
         .eq("id", run.id),
     ]);
-    return { sourceId: source.id, fetched: candidates.length, inserted, duplicates, rejected, status: "succeeded" };
+    return {
+      sourceId: source.id,
+      fetched: candidates.length,
+      inserted,
+      duplicates,
+      rejected,
+      status: "succeeded",
+      enriched: enrichment.enriched,
+      enrichmentFailed: enrichment.failed,
+      enrichmentFailures: enrichment.failures,
+    };
   } catch (error) {
     const code = safeErrorCode(error);
     const finishedAt = new Date().toISOString();

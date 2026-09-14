@@ -47,4 +47,9 @@ export interface SourceResult {
   rejected: number;
   status: "succeeded" | "failed";
   errorCode?: string;
+  /** Source pages fetched to fill in a body or image; see enrichBatch. */
+  enriched?: number;
+  enrichmentFailed?: number;
+  /** Failed page fetches keyed `host:CODE`, never by URL. */
+  enrichmentFailures?: Record<string, number>;
 }
