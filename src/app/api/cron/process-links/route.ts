@@ -18,7 +18,14 @@ async function run(request: Request) {
   } catch (error) {
     console.error("[Link queue] Worker module failed to load:", error);
     return NextResponse.json(
-      { error: "Queue worker code failed to load.", code: "QUEUE_MODULE_LOAD_FAILED", node: process.version, detail: error instanceof Error ? `${error.name}: ${error.message}` : String(error) },
+      {
+        error: "Queue worker code failed to load.",
+        code: "QUEUE_MODULE_LOAD_FAILED",
+        node: process.version,
+        requireModule: (process.features as { require_module?: boolean }).require_module ?? null,
+        execArgv: process.execArgv,
+        detail: error instanceof Error ? `${error.name}: ${error.message}` : String(error),
+      },
       { status: 503 },
     );
   }

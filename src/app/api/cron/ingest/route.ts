@@ -46,7 +46,14 @@ async function runIngestion(request: Request) {
   } catch (error) {
     console.error("[Ingestion] Adapter modules failed to load:", error);
     return NextResponse.json(
-      { error: "Ingestion code failed to load.", code: "INGESTION_MODULE_LOAD_FAILED", node: process.version, detail: error instanceof Error ? `${error.name}: ${error.message}` : String(error) },
+      {
+        error: "Ingestion code failed to load.",
+        code: "INGESTION_MODULE_LOAD_FAILED",
+        node: process.version,
+        requireModule: (process.features as { require_module?: boolean }).require_module ?? null,
+        execArgv: process.execArgv,
+        detail: error instanceof Error ? `${error.name}: ${error.message}` : String(error),
+      },
       { status: 503 },
     );
   }

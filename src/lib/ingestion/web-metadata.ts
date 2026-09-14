@@ -1,7 +1,25 @@
 import { Readability } from "@mozilla/readability";
-import { JSDOM } from "jsdom";
+import { parseHTML } from "linkedom";
 import { MAX_BODY_TEXT_CHARS, safeImageUrl } from "@/lib/ingestion/rss";
 import { canonicalizeUrl } from "@/lib/url";
+
+/**
+ * The DOM behind Readability is linkedom, pinned to 0.16.x, not jsdom.
+ *
+ * The Vercel runtime (Node 22.23 on 2026-09-14) runs functions with
+ * require(esm) disabled, and every jsdom line from 27 up pulls in a CommonJS
+ * dependency that `require()`s an ES module (`html-encoding-sniffer` 6,
+ * `@asamuzakjp/css-color`), so importing jsdom threw ERR_REQUIRE_ESM and every
+ * route that extracts a page answered an empty 500 -- including link
+ * submission. linkedom 0.16 depends only on CommonJS packages; 0.18 does not
+ * (css-select 7 is ESM-only), which is why the version is exact. Verify a
+ * dependency change with `node --no-experimental-require-module -e
+ * "require('linkedom')"`, which reproduces the host exactly.
+ *
+ * Readability resolves relative links against `document.baseURI`, which
+ * linkedom leaves undefined; it falls back to the raw value, and the fields
+ * this module returns are resolved against the requested URL here anyway.
+ */
 
 export interface WebMetadata {
   canonicalUrl: string;
@@ -107,8 +125,7 @@ function parseJsonLd(document: Document): JsonLdArticle {
 }
 
 export function parseWebMetadata(html: string, requestedUrl: string): WebMetadata {
-  const dom = new JSDOM(html, { url: requestedUrl });
-  const document = dom.window.document;
+  const document = parseHTML(html).document as unknown as Document;
   const readable = new Readability(document.cloneNode(true) as Document).parse();
   const jsonLd = parseJsonLd(document);
   const canonicalHref = document.querySelector('link[rel="canonical"]')?.getAttribute("href");

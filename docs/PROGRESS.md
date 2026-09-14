@@ -53,7 +53,7 @@ Vitest prints a warning that `vitest.config.ts` uses ESM syntax in a CommonJS co
 
 ### Local environment notes
 
-- `node_modules` must match `package.json` from the 2026-09-02 rebuild. An older install lacks `vitest`, `fast-xml-parser`, `jsdom`, and `@mozilla/readability`.
+- `node_modules` must match `package.json` from the 2026-09-02 rebuild. An older install lacks `vitest`, `fast-xml-parser`, `linkedom` (replaced `jsdom` on 2026-09-14), and `@mozilla/readability`.
 - A stale `.next/types/validator.ts` from a pre-rebuild build makes `typecheck` fail with "Cannot find module" errors for deleted routes. Run `npm run build` (or delete `.next`) to regenerate it.
 - `npm ci` cannot delete the SWC binary while `next dev` is running on Windows. Stop the dev server first or use `npm install`.
 - `next-env.d.ts` is rewritten by `next dev` and `next build` and shows up as modified. Committing it with your work keeps the tree clean.

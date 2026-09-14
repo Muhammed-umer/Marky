@@ -82,9 +82,15 @@ Use the real calendar date of the change. If an entry is reconstructed later, sa
 - **Vercel runtime.** After the deploy, every route that loads the extractor (`ingest`,
   `process-links`, `backfill`, `submissions`) answered an empty 500 before its auth check.
   The two cron routes now import their heavy modules inside the handler and answer 503 with
-  the error, which read: `ERR_REQUIRE_ESM: require() of ES Module @exodus/bytes/encoding-lite.js
-  from html-encoding-sniffer` — jsdom 30's dependency needs Node 20.19+ / 22.12+, and the
-  `engines` range `>=22` is not a form Vercel maps to a runtime. Pinned to `"22.x"`.
+  the error: `ERR_REQUIRE_ESM: require() of ES Module … from html-encoding-sniffer`. The host
+  is Node 22.23.2 but runs functions with `require(esm)` disabled, and every jsdom line from 27
+  up has a CommonJS dependency that `require()`s an ES module (jsdom 27: `@asamuzakjp/css-color`
+  → `@csstools/css-calc`). `node --no-experimental-require-module -e "require('jsdom')"`
+  reproduces it exactly. jsdom is replaced by **linkedom 0.16.11** (exact pin; 0.18 depends on
+  the ESM-only css-select 7), which loads under that restriction; `parseWebMetadata` and its
+  tests are otherwise unchanged. `engines.node` is also set to the documented `"22.x"` form.
+  This has been broken on production for every deployment that contained the extractor, which
+  means link submission (`POST /api/submissions`) was answering 500 on production too.
 
 ### Known limitations
 - **Medium.** Medium's Cloudflare answers Node's `fetch` with HTTP 403 whatever the headers

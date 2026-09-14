@@ -20,7 +20,7 @@
     "@supabase/supabase-js": "latest",
     "fast-xml-parser": "5.11.1",
     "framer-motion": "latest",
-    "jsdom": "27.2.0",
+    "linkedom": "0.16.11",
     "lucide-react": "latest",
     "next": "latest",
     "react": "latest",
@@ -28,7 +28,6 @@
     "zod": "latest"
   },
   "devDependencies": {
-    "@types/jsdom": "^30.0.0",
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",

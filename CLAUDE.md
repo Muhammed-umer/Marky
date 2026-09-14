@@ -80,7 +80,7 @@ A successful submission both stores the content item and creates the `saved_item
 
 ### Fetch safety
 
-All outbound fetches go through `assertPublicHttpUrl` in `src/lib/ingestion/network.ts`, which resolves DNS and rejects private/loopback/link-local/CGNAT ranges, credentials in URLs, explicit ports, and `localhost`/`.local`. Adapters add conditional requests (ETag/Last-Modified), size caps, and timeouts. Extraction of submitted pages uses Readability + jsdom in `src/lib/ingestion/web.ts`. Do not add a `fetch` of user- or feed-supplied URLs that bypasses this helper.
+All outbound fetches go through `assertPublicHttpUrl` in `src/lib/ingestion/network.ts`, which resolves DNS and rejects private/loopback/link-local/CGNAT ranges, credentials in URLs, explicit ports, and `localhost`/`.local`. Adapters add conditional requests (ETag/Last-Modified), size caps, and timeouts. Extraction of submitted pages uses Readability + linkedom (pinned 0.16.x, see the comment in `src/lib/ingestion/web-metadata.ts`) in `src/lib/ingestion/web.ts`. Do not add a `fetch` of user- or feed-supplied URLs that bypasses this helper. The Vercel runtime runs with `require(esm)` disabled: before adding or upgrading a server dependency, check it with `node --no-experimental-require-module -e "require('<pkg>')"` — jsdom 27+ fails that check, which is why it was removed.
 
 ### Topics, classification, ranking
 
