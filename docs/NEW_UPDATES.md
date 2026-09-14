@@ -97,6 +97,13 @@ Use the real calendar date of the change. If an entry is reconstructed later, sa
   tests are otherwise unchanged. `engines.node` is also set to the documented `"22.x"` form.
   This has been broken on production for every deployment that contained the extractor, which
   means link submission (`POST /api/submissions`) was answering 500 on production too.
+- **pg_net gave the cron routes 5 seconds.** None of the three trigger functions passed
+  `timeout_milliseconds` to `net.http_post`, so pg_net 0.20.4 used its default; from 11:30 UTC
+  every scheduled call ended in `Timeout of 5000 ms reached` in `net._http_response` and no
+  run was recorded, while a direct call to the same route succeeded. Migration
+  `20260914120000_raise_cron_request_timeouts.sql` re-creates the three functions with
+  `timeout_milliseconds := 65000` (the routes' 60 s `maxDuration` plus a cold start); applied to
+  the live project the same day.
 
 ### Known limitations
 - **Medium.** Medium's Cloudflare answers Node's `fetch` with HTTP 403 whatever the headers
