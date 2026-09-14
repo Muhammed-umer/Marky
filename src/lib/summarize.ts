@@ -170,3 +170,21 @@ export function keyPoints(bodyText: string | null | undefined, options: KeyPoint
 export function keyPointsForTopics(bodyText: string | null | undefined, topics: Interest[], max?: number): string[] {
   return keyPoints(bodyText, { aliases: topics, max });
 }
+
+/** The card and the brief both show three to five points. */
+export const CARD_KEY_POINTS_MAX = 5;
+/**
+ * Fewer than this and the "points" are the article's only two usable
+ * sentences, which the summary already covers; the card omits the block.
+ */
+export const CARD_KEY_POINTS_MIN = 3;
+
+/**
+ * What the feed attaches to each card: three to five sentences, or nothing.
+ * Nothing rather than one or two, because a block headed "Key points" with a
+ * single line under it is a summary pretending to be a digest.
+ */
+export function cardKeyPoints(bodyText: string | null | undefined, topics: Interest[]): string[] {
+  const points = keyPoints(bodyText, { aliases: topics, max: CARD_KEY_POINTS_MAX });
+  return points.length >= CARD_KEY_POINTS_MIN ? points : [];
+}

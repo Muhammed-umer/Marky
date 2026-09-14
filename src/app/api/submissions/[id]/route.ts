@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { CONTENT_ITEM_SELECTION, toFeedItem, type ContentItemRow } from "@/lib/feed-item";
+import { cardKeyPoints } from "@/lib/summarize";
 import { createAdminSupabaseClient } from "@/lib/supabase";
 
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
@@ -29,7 +30,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   if (data.status === "completed" && data.content_item_id) {
     const { data: row } = await supabase
       .from("content_items")
-      .select(CONTENT_ITEM_SELECTION)
+      .select(`${CONTENT_ITEM_SELECTION},body_content`)
       .eq("id", data.content_item_id)
       .maybeSingle();
     if (row) {
@@ -41,7 +42,11 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
         .eq("user_id", profile.id)
         .eq("content_item_id", data.content_item_id)
         .maybeSingle();
-      item = toFeedItem(row as unknown as ContentItemRow, { saved: true, read: Boolean(savedRow?.is_read) });
+      item = toFeedItem(row as unknown as ContentItemRow, { saved: true, read: Boolean(savedRow?.is_read), isSubmittedLink: true });
+      // The same points the feed would attach on the next reload, so the card
+      // the poller inserts does not change shape when the page is refreshed.
+      const points = cardKeyPoints((row as { body_content?: string | null }).body_content, item.interests);
+      if (points.length) item = { ...item, keyPoints: points };
     }
   }
 

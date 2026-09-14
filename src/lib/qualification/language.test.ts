@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { englishStopwordRatio, isLikelyNonEnglish, nonLatinRatio } from "@/lib/qualification/reject";
+import { accentedLatinRatio, englishStopwordRatio, functionWordBalance, isLikelyNonEnglish, nonLatinRatio } from "@/lib/qualification/reject";
 import { qualifyCandidate } from "@/lib/qualification";
 import type { QualificationCandidate, QualificationContext } from "@/lib/qualification/types";
 
@@ -72,6 +72,53 @@ describe("isLikelyNonEnglish", () => {
     expect(isLikelyNonEnglish(candidate({ title: "GPT-5 ships", summary: null, bodyText: null }))).toBe(false);
   });
 
+  it("rejects the Indonesian title that reached the feed with no body to judge", () => {
+    // Verbatim from a row stored 2026-09-14. Latin script, fewer than 40 words,
+    // so the stopword ratio never ran: the regression this stage exists for.
+    expect(isLikelyNonEnglish(candidate({
+      title: "Drama OpenAI vs Anthropic Gara-Gara Soal Matematika: Ini yang Bisa Dipelajari Marketer",
+      summary: "Continue reading on Medium »",
+      bodyText: null,
+    }))).toBe(true);
+  });
+
+  it("rejects short Latin-script titles in other languages", () => {
+    const titles = [
+      "Cómo usar Next.js con TypeScript en 2026",
+      "Was ist neu in Next.js 16? Ein Überblick für Einsteiger",
+      "O que muda com a nova versão do React para quem está começando",
+      "Pourquoi les développeurs adoptent Supabase cette année",
+      "Cách sử dụng Next.js với TypeScript cho người mới",
+      "Yapay zeka ile yeni bir uygulama nasıl yapılır",
+      "Paano gumawa ng app gamit ang React at Supabase",
+    ];
+    for (const title of titles) {
+      expect(isLikelyNonEnglish(candidate({ title, summary: null, bodyText: null })), title).toBe(true);
+    }
+  });
+
+  it("keeps English titles that carry a foreign word, a name or a locale tag", () => {
+    const titles = [
+      "Dan Abramov on what React Server Components change",
+      "Setting the default locale to en-US in Next.js middleware",
+      "A la carte pricing for Vercel's new compute tiers",
+      "Déjà vu: why GitHub Copilot's new agent mode feels familiar",
+      "Red Hat and NVIDIA partner on enterprise inference",
+      "Jest vs Vitest in 2026: which one should you pick?",
+      "Interview with José García on TypeScript's new compiler",
+      "Building a no-op middleware to test the edge runtime",
+    ];
+    for (const title of titles) {
+      expect(isLikelyNonEnglish(candidate({ title, summary: null, bodyText: null })), title).toBe(false);
+    }
+  });
+
+  it("does not let an English teaser rescue a foreign body", () => {
+    const indonesian = "Artikel ini membahas bagaimana cara menggunakan model terbaru dari OpenAI untuk membuat "
+      + "aplikasi yang lebih cerdas, dan apa saja yang harus diperhatikan oleh pengembang sebelum mulai.";
+    expect(isLikelyNonEnglish(candidate({ title: "OpenAI GPT-5 untuk pemula", summary: "Read more on Medium.", bodyText: indonesian }))).toBe(true);
+  });
+
   it("catches Latin-script prose that is not English", () => {
     const spanish = "Esta guia explica como usar el nuevo modo de renderizado en tus rutas, "
       + "porque cambia la forma en que las paginas se generan, cuando conviene adoptarlo, "
@@ -85,6 +132,26 @@ describe("isLikelyNonEnglish", () => {
         + "so that the router knows what to do, and after that the build will work as you expect it to.",
     });
     expect(isLikelyNonEnglish(codey)).toBe(false);
+  });
+});
+
+describe("functionWordBalance", () => {
+  it("counts whole words on each side", () => {
+    expect(functionWordBalance("Ini yang bisa dipelajari dari the release")).toMatchObject({ foreign: 4, foreignDistinct: 4, english: 1 });
+  });
+
+  it("never counts a foreign word that is also an English word or name", () => {
+    expect(functionWordBalance("Dan met her at the Red Hat booth to talk about Jest").foreign).toBe(0);
+  });
+});
+
+describe("accentedLatinRatio", () => {
+  it("is zero for English and for a lone accented name", () => {
+    expect(accentedLatinRatio("Interview with José on the new compiler")).toBe(0);
+  });
+
+  it("is high for Vietnamese", () => {
+    expect(accentedLatinRatio("Hướng dẫn sử dụng TypeScript cho người mới bắt đầu")).toBeGreaterThan(0.12);
   });
 });
 

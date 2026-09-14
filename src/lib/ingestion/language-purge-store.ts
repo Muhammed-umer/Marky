@@ -55,17 +55,27 @@ async function loadItems(client: SupabaseClient, windowDays: number, limit: numb
  * as a protection filter, so a miss must be impossible for the rows in hand,
  * but ids outside the window are irrelevant.
  */
+/**
+ * PostgREST puts `in` filters in the GET query string, and a few hundred UUIDs
+ * overflow the URL (the feed route hit the same limit). Chunked, so a full
+ * scan of the table can be protected, not just a small window.
+ */
+const ID_CHUNK = 80;
+
 async function loadProtectedIds(client: SupabaseClient, ids: string[]): Promise<{ saved: Set<string>; submitted: Set<string> }> {
-  if (!ids.length) return { saved: new Set(), submitted: new Set() };
-  const [{ data: savedRows, error: savedError }, { data: submissionRows, error: submissionError }] = await Promise.all([
-    client.from("saved_items").select("content_item_id").in("content_item_id", ids),
-    client.from("user_submissions").select("content_item_id").in("content_item_id", ids),
-  ]);
-  if (savedError || submissionError) throw new Error("PURGE_OWNERSHIP_READ_FAILED");
-  return {
-    saved: new Set((savedRows ?? []).map((row) => row.content_item_id as string)),
-    submitted: new Set((submissionRows ?? []).map((row) => row.content_item_id as string).filter(Boolean)),
-  };
+  const saved = new Set<string>();
+  const submitted = new Set<string>();
+  for (let index = 0; index < ids.length; index += ID_CHUNK) {
+    const chunk = ids.slice(index, index + ID_CHUNK);
+    const [{ data: savedRows, error: savedError }, { data: submissionRows, error: submissionError }] = await Promise.all([
+      client.from("saved_items").select("content_item_id").in("content_item_id", chunk),
+      client.from("user_submissions").select("content_item_id").in("content_item_id", chunk),
+    ]);
+    if (savedError || submissionError) throw new Error("PURGE_OWNERSHIP_READ_FAILED");
+    for (const row of savedRows ?? []) saved.add(row.content_item_id as string);
+    for (const row of submissionRows ?? []) if (row.content_item_id) submitted.add(row.content_item_id as string);
+  }
+  return { saved, submitted };
 }
 
 export async function runLanguagePurge(
@@ -93,7 +103,10 @@ export async function runLanguagePurge(
     return report;
   }
 
-  const { error } = await client.from("content_items").delete().in("id", plan.remove.map((item) => item.id));
-  if (error) throw new Error("PURGE_DELETE_FAILED");
+  const removeIds = plan.remove.map((item) => item.id);
+  for (let index = 0; index < removeIds.length; index += ID_CHUNK) {
+    const { error } = await client.from("content_items").delete().in("id", removeIds.slice(index, index + ID_CHUNK));
+    if (error) throw new Error("PURGE_DELETE_FAILED");
+  }
   return report;
 }

@@ -55,6 +55,30 @@
   line-height: 1.5;
 }
 
+.topics-select-all {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: 2px 2px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--reader-muted, #6b6b67);
+  cursor: pointer;
+  user-select: none;
+}
+
+.topics-select-all:hover {
+  color: var(--reader-ink, #242424);
+}
+
+.topics-select-all input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--reader-green, #176b45);
+  cursor: pointer;
+}
+
 /* Redesigned Topic Selection Card Grid System */
 .topic-card-grid {
   display: grid;
@@ -240,11 +264,17 @@
 .profile-identity h2,.profile-card h2{margin:0;font-size:19px}
 .profile-identity p{display:flex;align-items:center;gap:7px;margin:7px 0 0;color:var(--reader-muted);font-size:13px}
 .profile-status{display:flex;align-items:center;gap:6px;margin-left:auto;padding:7px 10px;border-radius:999px;background:#edf6ef;color:var(--reader-green);font-size:11px;font-weight:750}
-.profile-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
-.profile-stat{display:grid;gap:5px;padding:20px;border-radius:11px;background:var(--reader-soft)}
-.profile-stat strong{font:700 29px var(--reader-serif)}
-.profile-stat span{color:var(--reader-muted);font-size:12px}
+.profile-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.profile-stat{display:grid;gap:4px;align-content:start;padding:20px;border-radius:11px;background:var(--reader-soft)}
+.profile-stat strong{font:700 29px/1.1 var(--reader-serif);font-variant-numeric:tabular-nums}
+.profile-stat span{color:var(--reader-ink);font-size:13px;font-weight:600}
+.profile-stat small{color:var(--reader-muted);font-size:11px;line-height:1.4}
+.profile-grid[aria-busy="true"] strong{color:var(--reader-muted)}
+.secondary-button{display:inline-flex;align-items:center;gap:8px;flex:0 0 auto;padding:10px 16px;border:1px solid var(--reader-line);border-radius:999px;background:#fff;color:var(--reader-ink);font-size:13px;font-weight:650;cursor:pointer;transition:background-color .15s ease,border-color .15s ease,box-shadow .15s ease}
+.secondary-button:hover{background:var(--reader-soft);border-color:#c9c9c4}
+.secondary-button svg{color:var(--reader-green)}
 .profile-card-icon{width:36px;height:36px;display:grid;place-items:center;margin-bottom:14px;border-radius:50%;background:#edf6ef;color:var(--reader-green)}
+.profile-preferences-header{display:grid;gap:18px;justify-items:start}
 .profile-card p{margin:8px 0 0;color:var(--reader-muted);font-size:13px;line-height:1.55}
 .profile-preferences{display:grid;grid-template-columns:minmax(210px,.8fr) 1.2fr;gap:28px;align-items:center}
 .profile-interest-list{display:flex;flex-wrap:wrap;gap:8px}
@@ -261,7 +291,7 @@
   .profile-main{padding-top:35px}
   .profile-identity{align-items:flex-start;flex-wrap:wrap}
   .profile-status{margin-left:0}
-  .profile-grid{grid-template-columns:1fr}
+  .profile-grid{grid-template-columns:repeat(2,1fr)}
   .profile-preferences{grid-template-columns:1fr}
 }
 .processing-banner{display:flex;align-items:center;gap:12px;margin-top:18px;padding:12px 15px;border:1px solid #dbe9de;border-radius:10px;background:#f4f8f3;color:var(--reader-green)}
@@ -311,7 +341,9 @@ button:disabled{cursor:not-allowed}
   .story-skeleton{grid-template-columns:minmax(0,1fr) 145px}
 }
 
-@media(max-width:760px){
+@media(max-width:834px){
+  /* Matches the breakpoint where reference.css hides the rail: the menu button
+     only appears once the drawer is the way to navigate. */
   .mobile-nav-scrim{position:fixed;inset:0;z-index:38;display:block;border:0;background:rgba(0,0,0,.28)}
   .mobile-nav-panel{position:fixed;top:0;bottom:0;left:0;z-index:39;width:min(310px,84vw);display:flex;flex-direction:column;padding:94px 20px 28px;background:#fff;box-shadow:18px 0 50px rgba(0,0,0,.14)}
   .mobile-nav-panel nav{display:grid;gap:6px}
@@ -363,8 +395,8 @@ button:disabled{cursor:not-allowed}
 }
 
 .auth-loading-content .marky-wordmark {
-  font: 700 36px/.8 var(--reader-serif, Georgia, serif);
-  letter-spacing: -2px;
+  font: 700 36px/1 var(--reader-serif, Georgia, serif);
+  letter-spacing: -1.2px;
   color: var(--reader-ink, #242424);
 }
 
@@ -398,10 +430,15 @@ button:disabled{cursor:not-allowed}
 }
 
 .public-brand {
-  font: 700 34px/.8 var(--reader-serif, Georgia, serif);
-  letter-spacing: -2px;
+  font: 700 32px/1 var(--reader-serif, Georgia, serif);
+  letter-spacing: -1.2px;
   color: var(--reader-ink, #242424);
   text-decoration: none;
+  transition: opacity 0.15s ease;
+}
+
+.public-brand:hover {
+  opacity: 0.72;
 }
 
 .public-nav-links {
@@ -902,8 +939,8 @@ button:disabled{cursor:not-allowed}
 }
 
 .public-footer-brand {
-  font: 700 24px/.8 var(--reader-serif, Georgia, serif);
-  letter-spacing: -1.5px;
+  font: 700 24px/1 var(--reader-serif, Georgia, serif);
+  letter-spacing: -1px;
   color: var(--reader-ink, #242424);
 }
 
@@ -1035,7 +1072,7 @@ button:disabled{cursor:not-allowed}
     grid-template-columns: 260px minmax(0, 1fr) 360px;
   }
   .reader-header {
-    grid-template-columns: 260px minmax(0, 1fr) auto;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     padding: 0 36px;
   }
   .feed-story {
@@ -1101,7 +1138,7 @@ button:disabled{cursor:not-allowed}
     grid-template-columns: 280px minmax(0, 1fr) 380px;
   }
   .reader-header {
-    grid-template-columns: 280px minmax(0, 1fr) auto;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     padding: 0 44px;
   }
   .reader-main {
@@ -1173,7 +1210,7 @@ button:disabled{cursor:not-allowed}
     grid-template-columns: 320px minmax(0, 1fr) 440px;
   }
   .reader-header {
-    grid-template-columns: 320px minmax(0, 1fr) auto;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     padding: 0 56px;
   }
   .reader-main {

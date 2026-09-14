@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { keyPoints, splitSentences } from "@/lib/summarize";
+import { cardKeyPoints, keyPoints, splitSentences } from "@/lib/summarize";
 
 const ARTICLE = [
   "GitHub availability report for August 2026 is here.",
@@ -71,5 +71,19 @@ describe("keyPoints", () => {
 
   it("is deterministic", () => {
     expect(keyPoints(ARTICLE, { aliases: ["github"] })).toStrictEqual(keyPoints(ARTICLE, { aliases: ["github"] }));
+  });
+});
+
+describe("cardKeyPoints", () => {
+  it("returns between three and five sentences for a real body", () => {
+    const points = cardKeyPoints(ARTICLE, ["GitHub"]);
+    expect(points.length).toBeGreaterThanOrEqual(3);
+    expect(points.length).toBeLessThanOrEqual(5);
+  });
+
+  it("returns nothing rather than one or two points", () => {
+    const thin = "This is the first sentence of a very short note about something. And here is the second one, which is also short.";
+    expect(cardKeyPoints(thin, [])).toEqual([]);
+    expect(cardKeyPoints(null, [])).toEqual([]);
   });
 });

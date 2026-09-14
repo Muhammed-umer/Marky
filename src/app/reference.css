@@ -1,10 +1,13 @@
 :root{--reader-bg:#fff;--reader-soft:#f6f6f4;--reader-ink:#242424;--reader-muted:#6b6b67;--reader-line:#e7e7e4;--reader-green:#176b45;--reader-serif:Georgia,"Times New Roman",serif;--reader-sans:Arial,Helvetica,sans-serif}
 body{background:var(--reader-bg);color:var(--reader-ink)}button,input{font:inherit}.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 .reader-shell{min-height:100vh;width:100%;max-width:1920px;margin:0 auto;display:grid;grid-template-columns:240px minmax(0,1fr) 340px;grid-template-rows:68px 1fr}
-.reader-header{position:sticky;top:0;z-index:20;grid-column:1/-1;display:grid;grid-template-columns:240px minmax(0,1fr) auto;align-items:center;height:68px;padding:0 28px;border-bottom:1px solid var(--reader-line);background:rgba(255,255,255,.96);backdrop-filter:blur(12px)}
-.header-brand{display:flex;align-items:center;gap:18px}
-.marky-wordmark{color:var(--reader-ink);font:700 35px/.8 var(--reader-serif);letter-spacing:-2px;text-decoration:none}
-.icon-button{width:38px;height:38px;display:grid;place-items:center;border:0;border-radius:50%;background:transparent;color:var(--reader-muted);cursor:pointer}
+/* The header's columns are its own: the brand keeps its width whatever the
+   sidebar below it is doing. */
+.reader-header{position:sticky;top:0;z-index:20;grid-column:1/-1;display:grid;grid-template-columns:auto minmax(0,1fr) auto;column-gap:28px;align-items:center;height:68px;padding:0 28px;border-bottom:1px solid var(--reader-line);background:rgba(255,255,255,.96);backdrop-filter:blur(12px)}
+.header-brand{display:flex;align-items:center;gap:14px;min-width:0}
+.marky-wordmark{display:inline-flex;align-items:center;color:var(--reader-ink);font:700 32px/1 var(--reader-serif);letter-spacing:-1.2px;text-decoration:none;white-space:nowrap;transition:opacity .15s ease}
+.marky-wordmark:hover{opacity:.72}
+.icon-button{width:38px;height:38px;display:grid;place-items:center;border:0;border-radius:50%;background:transparent;color:var(--reader-muted);cursor:pointer;transition:background-color .15s ease,color .15s ease}
 .icon-button:hover{background:var(--reader-soft);color:var(--reader-ink)}
 .mobile-menu{display:none}
 .reader-search{width:min(360px,100%);height:44px;display:flex;align-items:center;gap:11px;padding:0 15px;border:1px solid transparent;border-radius:999px;background:var(--reader-soft);color:var(--reader-muted)}
@@ -12,8 +15,8 @@ body{background:var(--reader-bg);color:var(--reader-ink)}button,input{font:inher
 .reader-search input{width:100%;border:0;outline:0;background:transparent;color:var(--reader-ink)}
 .reader-search button{width:24px;height:24px;display:grid;place-items:center;border:0;background:none;cursor:pointer}
 .header-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px}
-.write-action{display:inline-flex;align-items:center;gap:8px;padding:9px 11px;border:0;background:transparent;color:var(--reader-muted);cursor:pointer}
-.write-action:hover{color:var(--reader-ink)}
+.write-action{display:inline-flex;align-items:center;gap:8px;padding:9px 13px;border:0;border-radius:999px;background:transparent;color:var(--reader-muted);cursor:pointer;transition:background-color .15s ease,color .15s ease}
+.write-action:hover{background:var(--reader-soft);color:var(--reader-ink)}
 .auth-controls{display:flex;align-items:center;gap:7px}
 .auth-link{padding:8px 12px;border:0;background:transparent;cursor:pointer}
 .auth-button,.primary-button{border:0;border-radius:999px;padding:10px 15px;background:var(--reader-ink);color:#fff;cursor:pointer}
@@ -21,13 +24,38 @@ body{background:var(--reader-bg);color:var(--reader-ink)}button,input{font:inher
 
 .reader-nav{position:sticky;top:68px;height:calc(100vh - 68px);display:flex;flex-direction:column;padding:37px 24px 24px;border-right:1px solid var(--reader-line)}
 .reader-nav nav{display:grid;gap:5px}
-.nav-link{width:100%;display:flex;align-items:center;gap:17px;padding:12px 10px;border:0;border-radius:8px;background:transparent;color:#565652;font-size:16px;text-align:left;cursor:pointer}
+.nav-link{width:100%;display:flex;align-items:center;gap:17px;padding:12px 10px;border:0;border-radius:8px;background:transparent;color:#565652;font-size:16px;text-align:left;cursor:pointer;transition:background-color .15s ease,color .15s ease}
+.nav-link svg{flex:0 0 auto}
+.nav-link span{white-space:nowrap}
 .nav-link:hover,.nav-link.active{background:var(--reader-soft);color:var(--reader-ink);font-weight:650}
-.nav-prompt{margin-top:34px;padding:23px 17px;border-top:1px solid var(--reader-line);color:var(--reader-muted)}
-.nav-prompt svg{color:var(--reader-green)}
-.nav-prompt strong{display:block;margin-top:10px;color:var(--reader-ink);font-size:14px}
-.nav-prompt p{margin:7px 0 14px;font-size:12px;line-height:1.5}
-.nav-prompt button{padding:0;border:0;background:none;color:var(--reader-green);font-size:12px;font-weight:750;cursor:pointer}
+/* Sidebar toggle: top-right of the rail, three bars that fold into an X on
+   click. No hover morph on this one: the icon states what the sidebar IS
+   (open = X, closed = bars), and previewing the other shape read as the
+   opposite. Hover is the shared icon-button background only. */
+.reader-nav-top{display:flex;justify-content:flex-end;margin:-16px -8px 12px 0}
+.nav-toggle{color:var(--reader-ink)}
+.burger{position:relative;width:20px;height:14px;display:block}
+.burger i{position:absolute;left:0;top:6px;width:100%;height:2px;border-radius:2px;background:currentColor;transform-origin:center;transition:transform .28s cubic-bezier(.4,0,.2,1),opacity .18s ease}
+.burger i:nth-child(1){transform:translateY(-6px)}
+.burger i:nth-child(2){transform:scaleX(1)}
+.burger i:nth-child(3){transform:translateY(6px)}
+.burger.is-x i:nth-child(1){transform:rotate(45deg)}
+.burger.is-x i:nth-child(2){opacity:0;transform:scaleX(0)}
+.burger.is-x i:nth-child(3){transform:rotate(-45deg)}
+/* Collapsed sidebar: an icon rail, never a hidden one. Two-class selectors
+   outrank the single-class breakpoint rules below, so one block covers every
+   desktop width. The header is untouched by this. */
+.reader-shell{transition:grid-template-columns .22s ease}
+.reader-shell.nav-collapsed{grid-template-columns:88px minmax(0,1fr) 340px}
+.reader-shell.nav-collapsed .reader-nav{padding-inline:14px}
+.reader-shell.nav-collapsed .reader-nav-top{justify-content:center;margin-right:0}
+.reader-shell.nav-collapsed .reader-nav .nav-link{justify-content:center;gap:0;padding-inline:0}
+.reader-shell.nav-collapsed .reader-nav .nav-link span{display:none}
+.reader-shell.nav-collapsed .nav-footer{display:none}
+.feed-more{min-height:64px;display:flex;align-items:center;justify-content:center;gap:9px;padding:22px 0 8px;color:var(--reader-muted);font-size:13px}
+.feed-more svg{animation:marky-spin 1s linear infinite}
+.feed-more button{padding:9px 18px;border:1px solid var(--reader-line);border-radius:999px;background:#fff;color:var(--reader-ink);font-weight:650;cursor:pointer;transition:background-color .15s ease,border-color .15s ease}
+.feed-more button:hover{background:var(--reader-soft);border-color:#c9c9c4}
 .nav-footer{margin:auto 10px 0;color:#9b9b96;font-size:11px;line-height:1.8}
 
 .reader-main{min-width:0;padding:48px 48px 80px;border-right:1px solid var(--reader-line)}
@@ -39,7 +67,8 @@ body{background:var(--reader-bg);color:var(--reader-ink)}button,input{font:inher
 .primary-add:hover{background:#0e5837}
 .reader-tabs{min-height:54px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--reader-line);width:100%}
 .reader-tabs>div{align-self:stretch;display:flex;gap:28px}
-.reader-tabs button{padding:0 1px;border:0;border-bottom:1px solid transparent;background:none;color:var(--reader-muted);cursor:pointer}
+.reader-tabs button{padding:0 1px;border:0;border-bottom:1px solid transparent;background:none;color:var(--reader-muted);cursor:pointer;transition:color .15s ease,border-color .15s ease}
+.reader-tabs button:hover{color:var(--reader-ink)}
 .reader-tabs button.active{border-color:var(--reader-ink);color:var(--reader-ink)}
 .reader-tabs>span{color:#90908b;font-size:12px}
 .feed-list{min-height:400px}
@@ -49,14 +78,26 @@ body{background:var(--reader-bg);color:var(--reader-ink)}button,input{font:inher
 .story-byline{display:flex;align-items:center;gap:7px;color:var(--reader-muted);font-size:12px}
 .author-avatar{width:24px;height:24px;display:grid;place-items:center;border-radius:50%;background:#e8eee8;color:var(--reader-green);font-size:10px;font-weight:800}
 .story-title{color:inherit;text-decoration:none}
-.story-title h2{margin:13px 0 7px;font:750 clamp(20px,2.2vw,24px)/1.15 var(--reader-sans);letter-spacing:-.55px}
+.story-title h2{margin:13px 0 7px;font:750 clamp(20px,2.2vw,24px)/1.15 var(--reader-sans);letter-spacing:-.55px;overflow-wrap:anywhere;text-wrap:balance}
 .story-title:hover h2{color:var(--reader-green)}
 .story-excerpt{display:-webkit-box;overflow:hidden;-webkit-box-orient:vertical;-webkit-line-clamp:2;margin:0;color:var(--reader-muted);font:15px/1.48 var(--reader-sans);max-width:75ch}
+.story-points{margin:12px 0 0;max-width:75ch}
+.story-points summary{display:inline-flex;align-items:center;gap:6px;padding:5px 9px 5px 9px;border-radius:999px;background:var(--reader-soft);color:#565652;font-size:12px;font-weight:600;line-height:1;cursor:pointer;list-style:none;user-select:none;transition:background-color .15s ease,color .15s ease}
+.story-points summary::-webkit-details-marker{display:none}
+.story-points summary:hover{background:#e8e8e2;color:var(--reader-ink)}
+.story-points summary:focus-visible{outline:2px solid var(--reader-green);outline-offset:2px}
+.story-points-count{padding:2px 6px;border-radius:999px;background:#fff;color:var(--reader-green);font-size:11px}
+.story-points-chevron{transition:transform .2s ease}
+.story-points[open] .story-points-chevron{transform:rotate(180deg)}
+.story-points ul{margin:12px 0 0;padding-left:20px}
+.story-points li{margin:0 0 8px;color:#44443f;font:14px/1.55 var(--reader-sans)}
+.story-points li:last-child{margin-bottom:0}
+.story-points-note{margin:8px 0 0;color:#90908b;font-size:11px}
 .story-copy footer{display:flex;justify-content:space-between;align-items:center;gap:15px;margin-top:21px;flex-wrap:wrap}
 .story-context{display:flex;align-items:center;gap:8px;color:#7e7e79;font-size:11px;flex-wrap:wrap}
 .topic-pill{padding:6px 9px;border-radius:999px;background:var(--reader-soft);color:#565652}
 .story-actions{display:flex;align-items:center;gap:4px}
-.story-actions button,.story-actions a{width:36px;height:36px;display:grid;place-items:center;border:0;border-radius:50%;background:transparent;color:#74746f;cursor:pointer}
+.story-actions button,.story-actions a{width:36px;height:36px;display:grid;place-items:center;border:0;border-radius:50%;background:transparent;color:#74746f;cursor:pointer;transition:background-color .15s ease,color .15s ease}
 .story-actions button:hover,.story-actions a:hover{background:var(--reader-soft);color:var(--reader-ink)}
 .story-actions .active{color:var(--reader-green)}
 .feed-thumbnail{position:relative;align-self:center;height:120px;overflow:hidden;border-radius:6px;background:var(--reader-soft)}
@@ -73,11 +114,11 @@ body{background:var(--reader-bg);color:var(--reader-ink)}button,input{font:inher
 .rail-icon{width:42px;height:42px;display:grid;place-items:center;border-radius:50%;background:#fff;color:var(--reader-green)}
 .rail-card h2,.rail-section h2{margin:17px 0 8px;font-size:18px;line-height:1.25}
 .rail-card p{margin:0;color:var(--reader-muted);font-size:13px;line-height:1.55}
-.rail-card button{margin-top:18px;padding:0;border:0;background:none;color:var(--reader-green);font-weight:750;cursor:pointer}
 .rail-section{padding:27px 0;border-bottom:1px solid var(--reader-line)}
 .rail-section>h2,.rail-title h2{margin:0 0 15px;font-size:17px}
 .rail-title{display:flex;justify-content:space-between;align-items:center}
-.rail-title button{border:0;background:none;color:var(--reader-muted);font-size:11px;cursor:pointer}
+.rail-title button{padding:5px 10px;border:0;border-radius:999px;background:none;color:var(--reader-muted);font-size:12px;font-weight:600;cursor:pointer;transition:background-color .15s ease,color .15s ease}
+.rail-title button:hover{background:var(--reader-soft);color:var(--reader-ink)}
 .rail-topics{display:flex;flex-wrap:wrap;gap:8px}
 .topic-tag-pill{padding:8px 12px;border:1px solid var(--reader-line);border-radius:999px;background:#fff;color:#555550;font-size:11px}
 .today-stat{display:flex;align-items:center;gap:9px;margin-top:11px;color:var(--reader-muted);font-size:12px}
@@ -104,29 +145,32 @@ body{background:var(--reader-bg);color:var(--reader-ink)}button,input{font:inher
 }
 
 @media(max-width:1024px){
-  .reader-shell{grid-template-columns:72px minmax(0,1fr) 260px}
-  .reader-header{grid-template-columns:72px minmax(0,1fr) auto;padding-inline:16px}
-  .marky-wordmark{display:none}
-  .mobile-menu{display:grid}
+  /* Narrow desktop and tablet: the rail auto-compacts to icons, so the manual
+     toggle has nothing to add and is hidden until there is room to choose. */
+  .reader-shell,.reader-shell.nav-collapsed{grid-template-columns:72px minmax(0,1fr) 260px}
+  .reader-header{padding-inline:16px;column-gap:16px}
+  .marky-wordmark{font-size:28px}
   .reader-nav{padding-inline:10px}
-  .nav-link{justify-content:center;padding:12px 0}
+  .nav-link{justify-content:center;gap:0;padding:12px 0}
   .nav-link span:not(.sr-only){display:none}
-  .nav-prompt,.nav-footer{display:none}
+  .reader-nav-top,.nav-footer{display:none}
   .reader-main{padding-inline:24px}
   .feed-story{grid-template-columns:minmax(0,1fr) 140px;gap:20px}
   .feed-thumbnail{height:100px}
 }
 
 @media(max-width:834px){
-  .reader-shell{grid-template-columns:minmax(0,1fr)}
+  /* Phone and small tablet: no rail at all, so the menu button appears and
+     the full wordmark returns as the always-visible way home. */
+  .reader-shell,.reader-shell.nav-collapsed{grid-template-columns:minmax(0,1fr)}
   .reader-nav,.reader-rail{display:none}
+  .mobile-menu{display:grid}
 }
 
 @media(max-width:768px){
   .reader-shell{display:block;max-width:100%}
   .reader-header{position:sticky;display:grid;grid-template-columns:auto 1fr auto;height:auto;min-height:60px;padding:10px 16px;gap:12px}
   .header-brand{gap:10px}
-  .marky-wordmark{display:block;font-size:28px}
   .reader-search{grid-column:1/-1;grid-row:2;width:100%;margin-top:4px}
   .write-action{display:none}
   .reader-main{padding:24px 16px 70px;border:0}
@@ -138,6 +182,7 @@ body{background:var(--reader-bg);color:var(--reader-ink)}button,input{font:inher
   .feed-story{grid-template-columns:minmax(0,1fr) 110px;gap:14px;padding:24px 0}
   .story-title h2{font-size:20px;margin:8px 0 6px}
   .story-excerpt{-webkit-line-clamp:2;font-size:13px}
+  .story-points li{font-size:13px}
   .feed-thumbnail{height:95px}
   .story-copy footer{margin-top:14px}
   .story-actions{display:flex}
@@ -153,6 +198,8 @@ body{background:var(--reader-bg);color:var(--reader-ink)}button,input{font:inher
   .feed-story{grid-template-columns:minmax(0,1fr) 90px;gap:10px;padding:18px 0}
   .story-title h2{font-size:17px;letter-spacing:-0.3px}
   .story-excerpt{font-size:12px;line-height:1.4}
+  .story-points{margin-top:9px}
+  .story-points li{font-size:12px;line-height:1.45}
   .feed-thumbnail{height:80px}
   .story-byline{font-size:11px}
   .topic-pill{padding:4px 7px;font-size:10px}

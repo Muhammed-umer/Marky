@@ -43,7 +43,10 @@ export interface ContentItemRow {
   signals?: unknown;
 }
 
-export function toFeedItem(row: ContentItemRow, state: { saved: boolean; read: boolean; selected?: Interest[] }): FeedItem {
+export function toFeedItem(
+  row: ContentItemRow,
+  state: { saved: boolean; read: boolean; selected?: Interest[]; isSubmittedLink?: boolean },
+): FeedItem {
   const storedInterests = (row.content_item_topics ?? []).flatMap((link) => {
     const name = relationName(link.topic);
     return interests.includes(name as Interest) ? [name as Interest] : [];
@@ -72,5 +75,6 @@ export function toFeedItem(row: ContentItemRow, state: { saved: boolean; read: b
     saved: state.saved,
     read: state.read,
     explanation: [itemInterests[0] ? `Matches ${itemInterests[0]}` : "Technology source", "From a tracked source"],
+    isSubmittedLink: state.isSubmittedLink ?? false,
   };
 }

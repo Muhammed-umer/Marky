@@ -72,5 +72,19 @@ export interface FeedItem {
   read: boolean;
   score?: number;
   explanation: string[];
+  /**
+   * True when this item exists because the reader pasted its URL into Marky,
+   * rather than because a source or discovery adapter found it. Lets the Saved
+   * page split its library into "Links" (this reader chose) and "Posts"
+   * (Marky found and this reader bookmarked). Absent/false means a post.
+   */
+  isSubmittedLink?: boolean;
+  /**
+   * Up to five sentences lifted verbatim from the stored article body, chosen
+   * by `keyPoints` in `src/lib/summarize.ts`. Absent or empty when no body was
+   * extracted; the card then shows only the publisher's summary. Never
+   * generated text: every line can be found in the original.
+   */
+  keyPoints?: string[];
 }
 

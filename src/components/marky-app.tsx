@@ -8,14 +8,15 @@ import {
   Bell,
   Bookmark,
   Check,
+  ChevronDown,
   Compass,
   ExternalLink,
   Heart,
   Home,
   Library,
+  ListChecks,
   LoaderCircle,
   Mail,
-  Menu,
   PenLine,
   Plus,
   Search,
@@ -26,11 +27,11 @@ import {
   SlidersHorizontal,
   Rss,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { AuthControls } from "@/components/auth-controls";
 import { thumbnailUrl } from "@/lib/images";
 import { rankItems } from "@/lib/ranking";
-import { keyPoints } from "@/lib/summarize";
+import { CARD_KEY_POINTS_MAX, keyPoints } from "@/lib/summarize";
 import { interests, isValidAuthor, type FeedItem, type FeedView, type Interest } from "@/lib/types";
 
 const viewCopy: Record<FeedView, { label: string; title: string; subtitle: string }> = {
@@ -65,6 +66,22 @@ function ReadingTime({ item, separator = false }: { item: FeedItem; separator?: 
 }
 
 /**
+ * Three bars that fold into an X. `open` draws the X (the panel is open, click
+ * closes it); the bars otherwise. The button's hover state previews the other
+ * shape, so the icon always shows what a click will do. Pure CSS: see
+ * `.burger` in reference.css.
+ */
+function BurgerIcon({ open }: { open: boolean }) {
+  return (
+    <span className={open ? "burger is-x" : "burger"} aria-hidden="true">
+      <i />
+      <i />
+      <i />
+    </span>
+  );
+}
+
+/**
  * Stored bodies are plain text. Readability keeps paragraph breaks as
  * newlines; feed-derived text has often been collapsed to one line, so a
  * single long block is re-broken at sentence ends into readable paragraphs.
@@ -85,7 +102,48 @@ function compactCount(value: number) {
   return new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(value);
 }
 
+/**
+ * Desktop sidebar state, remembered per browser. Modelled as an external store
+ * rather than useState + effect: the server snapshot is always "expanded", the
+ * client reads storage during hydration, so there is no mismatch and no
+ * post-mount flash. A module-level mirror keeps the toggle working when
+ * storage is unavailable (private mode, blocked site data).
+ */
+const NAV_COLLAPSED_KEY = "marky:nav-collapsed";
+const NAV_COLLAPSED_EVENT = "marky:nav-collapsed";
+let navCollapsedMirror: boolean | null = null;
+
+function readNavCollapsed(): boolean {
+  if (navCollapsedMirror !== null) return navCollapsedMirror;
+  try {
+    return window.localStorage.getItem(NAV_COLLAPSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writeNavCollapsed(next: boolean) {
+  navCollapsedMirror = next;
+  try {
+    window.localStorage.setItem(NAV_COLLAPSED_KEY, next ? "1" : "0");
+  } catch {
+    // The mirror above still drives this page view.
+  }
+  window.dispatchEvent(new Event(NAV_COLLAPSED_EVENT));
+}
+
+function subscribeNavCollapsed(onChange: () => void) {
+  window.addEventListener(NAV_COLLAPSED_EVENT, onChange);
+  window.addEventListener("storage", onChange);
+  return () => {
+    window.removeEventListener(NAV_COLLAPSED_EVENT, onChange);
+    window.removeEventListener("storage", onChange);
+  };
+}
+
 type UserSummary = { name: string; email: string; imageUrl: string | null };
+/** Reading-activity counts from /api/user/stats; null until loaded. */
+type ProfileStats = { links: number; posts: number; read: number; topics: number };
 type MarkyPage = "home" | "saved" | "profile";
 type MarkyAppProps = { initialItems?: FeedItem[]; demoMode?: boolean; authEnabled: boolean; initialPage?: MarkyPage; initialIsSignedIn?: boolean };
 
@@ -95,7 +153,7 @@ function ProfilePanel({
   authLoaded,
   isSignedIn,
   user,
-  items,
+  stats,
   userTopics,
   onOpenTopicsModal,
 }: {
@@ -103,7 +161,7 @@ function ProfilePanel({
   authLoaded: boolean;
   isSignedIn: boolean;
   user: UserSummary | null;
-  items: FeedItem[];
+  stats: ProfileStats | null;
   userTopics: string[];
   onOpenTopicsModal: () => void;
 }) {
@@ -134,8 +192,9 @@ function ProfilePanel({
     );
   }
 
-  const savedCount = items.filter((item) => item.saved).length;
-  const readCount = items.filter((item) => item.read).length;
+  // Counts come from the ownership tables, not the loaded feed: the dashboard
+  // hides the reader's own links and only reaches back a few days.
+  const stat = (value: number | undefined) => (typeof value === "number" ? value : "–");
   return (
     <div className="profile-content">
       <section className="profile-heading">
@@ -158,18 +217,26 @@ function ProfilePanel({
           <ShieldCheck size={15} /> Signed in
         </span>
       </section>
-      <section className="profile-grid" aria-label="Reading activity">
+      <section className="profile-grid" aria-label="Reading activity" aria-busy={stats === null}>
         <div className="profile-stat">
-          <strong>{savedCount}</strong>
-          <span>Saved articles</span>
+          <strong>{stat(stats?.links)}</strong>
+          <span>Saved links</span>
+          <small>Added by you</small>
         </div>
         <div className="profile-stat">
-          <strong>{readCount}</strong>
+          <strong>{stat(stats?.posts)}</strong>
+          <span>Saved posts</span>
+          <small>Bookmarked from the feed</small>
+        </div>
+        <div className="profile-stat">
+          <strong>{stat(stats?.read)}</strong>
           <span>Articles read</span>
+          <small>Marked read in your library</small>
         </div>
         <div className="profile-stat">
           <strong>{userTopics.length}</strong>
           <span>Topics followed</span>
+          <small>Shape your briefing</small>
         </div>
       </section>
       <section className="profile-card profile-preferences">
@@ -224,7 +291,7 @@ export function PublicLanding({ authEnabled }: { authEnabled: boolean }) {
         <div className="public-header-inner">
           <div className="public-header-left">
             <a href="#top" className="public-brand">
-              marky
+              Marky
             </a>
           </div>
           <nav className="public-nav-links" aria-label="Public navigation">
@@ -253,7 +320,7 @@ export function PublicLanding({ authEnabled }: { authEnabled: boolean }) {
               aria-label="Toggle navigation menu"
               onClick={() => setMobileMenuOpen((prev) => !prev)}
             >
-              {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
+              <BurgerIcon open={mobileMenuOpen} />
             </button>
           </div>
         </div>
@@ -557,7 +624,7 @@ export function PublicLanding({ authEnabled }: { authEnabled: boolean }) {
       {/* Footer */}
       <footer className="public-footer">
         <div className="public-footer-inner">
-          <span className="public-footer-brand">marky</span>
+          <span className="public-footer-brand">Marky</span>
           <span className="public-footer-copy">© 2026 Marky. Source-grounded technology reader.</span>
           <div className="public-footer-links">
             <a href="#top">Back to top</a>
@@ -583,9 +650,11 @@ function MarkyExperience({
 }: MarkyAppProps & { authLoaded: boolean; isSignedIn: boolean; userSummary: UserSummary | null }) {
   const [items, setItems] = useState<FeedItem[]>(demoMode ? initialItems : []);
   const [view, setView] = useState<FeedView>("for-you");
-  const [interest, setInterest] = useState<Interest | "All Interests">("All Interests");
   const [query, setQuery] = useState("");
   const [savedOnly, setSavedOnly] = useState(initialPage === "saved");
+  // Saved page only: split the library into links the reader pasted in
+  // themselves versus posts Marky found and they bookmarked.
+  const [savedTab, setSavedTab] = useState<"links" | "posts">("links");
   const [adding, setAdding] = useState(false);
   const [editingTopics, setEditingTopics] = useState(false);
   const [submittedUrl, setSubmittedUrl] = useState("");
@@ -593,6 +662,7 @@ function MarkyExperience({
   const [submittingLink, setSubmittingLink] = useState(false);
   const [pendingSubmissionIds, setPendingSubmissionIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(!demoMode && isSignedIn);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [selectedItem, setSelectedItem] = useState<FeedItem | null>(null);
   const [article, setArticle] = useState<ArticleState | null>(null);
   const selectedItemId = selectedItem?.id ?? null;
@@ -606,11 +676,16 @@ function MarkyExperience({
   const showFullArticle = expandedArticleId !== null && expandedArticleId === selectedItemId;
 
   // The brief leads with the points and keeps the full text one click away: a
-  // 14-minute report dumped whole is not a brief.
+  // 14-minute report dumped whole is not a brief. The feed already attached
+  // the points to the card, so they show the instant the brief opens; the
+  // body is only consulted for an item the feed had no points for.
   const briefPoints = useMemo(
-    () => (article?.id === selectedItemId && article.bodyText
-      ? keyPoints(article.bodyText, { aliases: selectedItem?.interests ?? [], max: 4 })
-      : []),
+    () => {
+      if (selectedItem?.keyPoints?.length) return selectedItem.keyPoints;
+      return article?.id === selectedItemId && article.bodyText
+        ? keyPoints(article.bodyText, { aliases: selectedItem?.interests ?? [], max: CARD_KEY_POINTS_MAX })
+        : [];
+    },
     [article, selectedItemId, selectedItem],
   );
   const fullArticleMinutes = selectedItem ? readingMinutes(selectedItem) : null;
@@ -633,6 +708,10 @@ function MarkyExperience({
     };
   }, [selectedItemId, articleEnabled]);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  // Desktop sidebar: collapsed narrows it to an icon rail, it never hides it,
+  // so Home / Saved / Profile stay one click away in either state.
+  const navCollapsed = useSyncExternalStore(subscribeNavCollapsed, readNavCollapsed, () => false);
+  const toggleNav = () => writeNavCollapsed(!navCollapsed);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [userTopics, setUserTopics] = useState<string[]>([]);
   const [savingTopics, setSavingTopics] = useState(false);
@@ -651,14 +730,35 @@ function MarkyExperience({
     [authLoaded, demoMode, isSignedIn],
   );
 
-  // Load Feed Data & User Topics for Authenticated Users
-  const fetchFeed = useCallback(async () => {
+  // Search runs on the server over the whole window, so keystrokes are
+  // debounced: one request per pause in typing, not one per character.
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(query.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  // Paging: the server hands back the cursor for the next page, null at the end.
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  // Load Feed Data & User Topics for Authenticated Users. Without a cursor the
+  // list is replaced (new view, tab or search); with one, the page is appended.
+  const fetchFeed = useCallback(async (cursor?: string) => {
     if (demoMode || !authLoaded || !isSignedIn) {
       setLoading(false);
       return;
     }
+    const search = new URLSearchParams({ view });
+    if (initialPage === "saved") {
+      search.set("page", "saved");
+      search.set("tab", savedTab);
+    }
+    if (debouncedQuery) search.set("q", debouncedQuery);
+    if (cursor) search.set("cursor", cursor);
+    if (cursor) setLoadingMore(true);
     try {
-      const response = await fetch(`/api/feed?view=${view}${initialPage === "saved" ? "&page=saved" : ""}`, { cache: "no-store" });
+      const response = await fetch(`/api/feed?${search.toString()}`, { cache: "no-store" });
       if (response.status === 401) {
         setItems([]);
         setLoading(false);
@@ -667,6 +767,7 @@ function MarkyExperience({
       if (!response.ok) throw new Error("Feed unavailable");
       const payload = (await response.json()) as {
         items?: FeedItem[];
+        nextCursor?: string | null;
         needsOnboarding?: boolean;
         selectedTopics?: string[];
       };
@@ -674,21 +775,33 @@ function MarkyExperience({
       if (payload.needsOnboarding) {
         setNeedsOnboarding(true);
         setItems([]);
+        setNextCursor(null);
         setUserTopics([]);
       } else {
         setNeedsOnboarding(false);
-        if (payload.items) setItems(payload.items);
+        const page = payload.items ?? [];
+        if (cursor) {
+          setItems((current) => {
+            const seen = new Set(current.map((item) => item.id));
+            return [...current, ...page.filter((item) => !seen.has(item.id))];
+          });
+        } else {
+          setItems(page);
+          setHasLoadedOnce(true);
+        }
+        setNextCursor(payload.nextCursor ?? null);
         if (payload.selectedTopics) {
           setUserTopics(payload.selectedTopics);
           setSelectedTopicDraft(payload.selectedTopics);
         }
       }
     } catch {
-      setNotice("Could not load your briefing.");
+      setNotice(cursor ? "Could not load more stories." : "Could not load your briefing.");
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
-  }, [authLoaded, demoMode, isSignedIn, view, initialPage]);
+  }, [authLoaded, demoMode, isSignedIn, view, initialPage, savedTab, debouncedQuery]);
 
   useEffect(() => {
     if (demoMode || !authLoaded || !isSignedIn) return;
@@ -698,6 +811,22 @@ function MarkyExperience({
     }, 0);
     return () => clearTimeout(timer);
   }, [fetchFeed, demoMode, authLoaded, isSignedIn]);
+
+  // Infinite scroll: a sentinel below the list asks for the next page as it
+  // comes into view. One request in flight at a time; nothing once the
+  // cursor is null.
+  const [sentinel, setSentinel] = useState<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!sentinel || !nextCursor || loadingMore || loading) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) void fetchFeed(nextCursor);
+      },
+      { rootMargin: "600px 0px" },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [sentinel, nextCursor, loadingMore, loading, fetchFeed]);
 
   // Load User Topics on initial sign in
   useEffect(() => {
@@ -798,20 +927,53 @@ function MarkyExperience({
     return () => window.clearInterval(interval);
   }, [demoMode, initialPage, pendingSubmissionIds]);
 
+  // Live mode: the server has already searched, split the library tab and
+  // paged, so nothing is filtered here. Demo mode has no server round trip,
+  // so it ranks and filters the bundled items locally against the topics the
+  // reader picked -- with none picked, nothing is assumed on their behalf.
   const visible = useMemo(() => {
-    const selected = interest === "All Interests" ? (userTopics.length ? userTopics as Interest[] : (["OpenAI", "Next.js", "Supabase"] as Interest[])) : [interest];
-    const normalizedQuery = query.trim().toLowerCase();
-    const orderedItems = demoMode ? rankItems(items, view, selected) : items;
+    const normalizedQuery = demoMode ? query.trim().toLowerCase() : "";
+    const orderedItems = demoMode ? rankItems(items, view, userTopics as Interest[]) : items;
     return orderedItems.filter(
       (item) =>
-        (interest === "All Interests" || item.interests.includes(interest)) &&
         (initialPage === "saved" || savedOnly ? item.saved : true) &&
+        (initialPage !== "saved" || (savedTab === "links" ? item.isSubmittedLink : !item.isSubmittedLink)) &&
         (!normalizedQuery || `${item.title} ${item.excerpt} ${item.source} ${item.author}`.toLowerCase().includes(normalizedQuery)),
     );
-  }, [demoMode, initialPage, items, view, interest, savedOnly, query, userTopics]);
+  }, [demoMode, initialPage, items, view, savedOnly, savedTab, query, userTopics]);
 
   const unreadCount = visible.filter((item) => !item.read).length;
-  const isFeedLoading = loading && isSignedIn;
+  // The skeleton is for the first load only; a search or tab change keeps the
+  // current list on screen and shows a quiet "updating" line instead.
+  const isFeedLoading = loading && isSignedIn && !hasLoadedOnce;
+  const isRefreshing = loading && isSignedIn && hasLoadedOnce;
+  const isSearching = debouncedQuery.length > 0;
+
+  // Profile counts: live from the ownership tables; demo from the bundled items.
+  const [profileStats, setProfileStats] = useState<ProfileStats | null>(null);
+  useEffect(() => {
+    if (initialPage !== "profile") return;
+    if (demoMode) {
+      const timer = setTimeout(() => setProfileStats({
+        links: items.filter((item) => item.saved && item.isSubmittedLink).length,
+        posts: items.filter((item) => item.saved && !item.isSubmittedLink).length,
+        read: items.filter((item) => item.read).length,
+        topics: userTopics.length,
+      }), 0);
+      return () => clearTimeout(timer);
+    }
+    if (!authLoaded || !isSignedIn) return;
+    let cancelled = false;
+    fetch("/api/user/stats", { cache: "no-store" })
+      .then(async (response) => (response.ok ? ((await response.json()) as ProfileStats) : null))
+      .then((data) => {
+        if (!cancelled && data) setProfileStats(data);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [initialPage, demoMode, authLoaded, isSignedIn, items, userTopics]);
 
   const [pendingMutations, setPendingMutations] = useState<string[]>([]);
 
@@ -889,6 +1051,20 @@ function MarkyExperience({
     };
   }, [adding, editingTopics, mobileNavOpen, selectedItem]);
 
+  // The drawer only exists below 834px (see reference.css). If the window is
+  // widened while it is open, close it, otherwise the body stays scroll-locked
+  // for a panel that is no longer rendered.
+  useEffect(() => {
+    if (!mobileNavOpen) return;
+    const media = window.matchMedia("(min-width: 835px)");
+    const close = () => {
+      if (media.matches) setMobileNavOpen(false);
+    };
+    close();
+    media.addEventListener("change", close);
+    return () => media.removeEventListener("change", close);
+  }, [mobileNavOpen]);
+
   function selectView(nextView: FeedView) {
     if (!demoMode) setLoading(true);
     setView(nextView);
@@ -920,7 +1096,6 @@ function MarkyExperience({
       setSubmittedUrl("");
       setAdding(false);
       setSavedOnly(initialPage === "saved");
-      setInterest("All Interests");
       setNotice("Link queued. Marky will notify you when the article is ready.");
     } catch (error) {
       setNotice(error instanceof Error && error.message ? error.message : "Enter a valid public HTTP or HTTPS link.");
@@ -945,7 +1120,7 @@ function MarkyExperience({
   }
 
   return (
-    <div className="reader-shell" id="top">
+    <div className={navCollapsed ? "reader-shell nav-collapsed" : "reader-shell"} id="top">
       <header className="reader-header">
         <div className="header-brand">
           <button
@@ -955,11 +1130,11 @@ function MarkyExperience({
             aria-controls="mobile-navigation"
             onClick={() => setMobileNavOpen((open) => !open)}
           >
-            {mobileNavOpen ? <X size={23} /> : <Menu size={23} />}
+            <BurgerIcon open={mobileNavOpen} />
           </button>
-          <a className="marky-wordmark" href="#top">
-            marky
-          </a>
+          <Link className="marky-wordmark" href="/" aria-label="Marky home">
+            Marky
+          </Link>
         </div>
         <label className="reader-search">
           <Search size={20} aria-hidden="true" />
@@ -989,26 +1164,29 @@ function MarkyExperience({
       </header>
 
       <aside className="reader-nav" aria-label="Main navigation">
+        <div className="reader-nav-top">
+          <button
+            type="button"
+            className="icon-button nav-toggle"
+            onClick={toggleNav}
+            aria-expanded={!navCollapsed}
+            aria-label={navCollapsed ? "Open sidebar" : "Close sidebar"}
+            title={navCollapsed ? "Open sidebar" : "Close sidebar"}
+          >
+            <BurgerIcon open={!navCollapsed} />
+          </button>
+        </div>
         <nav>
-          <Link className={initialPage === "home" && !savedOnly && view === "for-you" ? "nav-link active" : "nav-link"} href="/">
-            <Home size={23} /> Home
+          <Link className={initialPage === "home" ? "nav-link active" : "nav-link"} href="/" title="Home">
+            <Home size={22} /> <span>Home</span>
           </Link>
-          <Link className={initialPage === "saved" ? "nav-link active" : "nav-link"} href="/saved">
-            <Library size={22} /> Saved
+          <Link className={initialPage === "saved" ? "nav-link active" : "nav-link"} href="/saved" title="Saved">
+            <Library size={22} /> <span>Saved</span>
           </Link>
-          <Link className={initialPage === "profile" ? "nav-link active" : "nav-link"} href="/profile">
-            <UserRound size={22} /> Profile
+          <Link className={initialPage === "profile" ? "nav-link active" : "nav-link"} href="/profile" title="Profile">
+            <UserRound size={22} /> <span>Profile</span>
           </Link>
-
         </nav>
-        {isSignedIn ? (
-          <div className="nav-prompt">
-            <Sparkles size={20} />
-            <strong>Your topics</strong>
-            <p>{userTopics.length ? `Following ${userTopics.length} topics` : "No topics selected"}</p>
-            <button onClick={() => setEditingTopics(true)}>Manage topics</button>
-          </div>
-        ) : null}
         <p className="nav-footer">
           About · Help · Privacy
           <br />© 2026 Marky
@@ -1059,7 +1237,7 @@ function MarkyExperience({
             authLoaded={authLoaded}
             isSignedIn={isSignedIn}
             user={userSummary}
-            items={items}
+            stats={profileStats}
             userTopics={userTopics}
             onOpenTopicsModal={() => setEditingTopics(true)}
           />
@@ -1086,14 +1264,24 @@ function MarkyExperience({
                   </button>
                 ))}
               </div>
-              <span>{unreadCount} unread</span>
+              <span>{isRefreshing ? (isSearching ? "Searching…" : "Updating…") : `${unreadCount} unread`}</span>
             </section>
           ) : (
-            <section className="reader-tabs saved-page-summary" aria-label="Saved articles summary">
-              <strong>
-                {visible.length} {visible.length === 1 ? "article" : "articles"}
-              </strong>
-              <span>{unreadCount} unread</span>
+            <section className="reader-tabs saved-page-summary" aria-label="Saved library">
+              <div role="tablist">
+                {(["links", "posts"] as const).map((tab) => (
+                  <button key={tab} role="tab" aria-selected={savedTab === tab} className={savedTab === tab ? "active" : ""} onClick={() => setSavedTab(tab)}>
+                    {tab === "links" ? "Links" : "Posts"}
+                  </button>
+                ))}
+              </div>
+              <span>
+                {isRefreshing ? (isSearching ? "Searching…" : "Updating…") : (
+                  <>
+                    <strong>{visible.length}</strong> {visible.length === 1 ? "article" : "articles"} · {unreadCount} unread
+                  </>
+                )}
+              </span>
             </section>
           )}
 
@@ -1125,16 +1313,32 @@ function MarkyExperience({
               </div>
             ) : visible.length === 0 ? (
               <div className="empty-state">
-                <Compass size={28} />
-                <h2>{savedOnly ? "Your library is ready for its first story" : "No stories found for your topics yet"}</h2>
+                {isSearching ? <Search size={28} /> : <Compass size={28} />}
+                <h2>
+                  {isSearching
+                    ? `No results for “${debouncedQuery}”`
+                    : savedOnly
+                    ? savedTab === "links"
+                      ? "No links added yet"
+                      : "No saved posts yet"
+                    : "No stories found for your topics yet"}
+                </h2>
                 <p>
-                  {savedOnly
-                    ? "Save a useful article and it will stay here for later."
+                  {isSearching
+                    ? savedOnly
+                      ? "Nothing in this part of your library matches. Try a different word, or check the other tab."
+                      : "Nothing from the last year of your topics matches. Try a shorter or different word."
+                    : savedOnly
+                    ? savedTab === "links"
+                      ? "Paste an article URL with Add link and it will stay here for later."
+                      : "Bookmark a story from your feed and it will stay here for later."
                     : userTopics.length > 0
                     ? `You follow ${userTopics.slice(0, 3).join(", ")}${userTopics.length > 3 ? ` and ${userTopics.length - 3} more` : ""}. As matching stories are ingested from connected sources, they will appear here.`
                     : "Select topics to personalize your feed."}
                 </p>
-                {userTopics.length === 0 ? (
+                {isSearching ? (
+                  <button onClick={() => setQuery("")}>Clear search</button>
+                ) : userTopics.length === 0 ? (
                   <button onClick={() => setEditingTopics(true)}>Select topics</button>
                 ) : (
                   <button onClick={() => setAdding(true)}>Submit an article URL</button>
@@ -1167,6 +1371,25 @@ function MarkyExperience({
                         <h2>{item.title}</h2>
                       </button>
                       <p className="story-excerpt">{item.excerpt}</p>
+                      {item.keyPoints?.length ? (
+                        // Native disclosure: closed by default so the list
+                        // stays scannable, no state to reset on refetch, and
+                        // keyboard/screen-reader behaviour comes for free.
+                        <details className="story-points">
+                          <summary>
+                            <ListChecks size={14} aria-hidden="true" />
+                            Key points
+                            <span className="story-points-count">{item.keyPoints.length}</span>
+                            <ChevronDown className="story-points-chevron" size={14} aria-hidden="true" />
+                          </summary>
+                          <ul>
+                            {item.keyPoints.map((point, pointIndex) => (
+                              <li key={pointIndex}>{point}</li>
+                            ))}
+                          </ul>
+                          <p className="story-points-note">Sentences from the article itself, not a rewrite.</p>
+                        </details>
+                      ) : null}
                       {item.explanation[0] ? (
                         <p className="ranking-reason">
                           <Sparkles size={13} />
@@ -1225,6 +1448,19 @@ function MarkyExperience({
                 ))}
               </AnimatePresence>
             )}
+            {!isFeedLoading && visible.length > 0 ? (
+              <div className="feed-more" ref={setSentinel} aria-live="polite">
+                {loadingMore ? (
+                  <>
+                    <LoaderCircle size={17} aria-hidden="true" /> Loading more stories…
+                  </>
+                ) : nextCursor ? (
+                  <button type="button" onClick={() => void fetchFeed(nextCursor)}>Load more</button>
+                ) : (
+                  <span>You&rsquo;re all caught up.</span>
+                )}
+              </div>
+            ) : null}
           </section>
         </main>
       )}
@@ -1238,7 +1474,6 @@ function MarkyExperience({
             </div>
             <h2>A calmer technology feed</h2>
             <p>Marky gathers useful reads, removes duplicates, and keeps your place.</p>
-            <button onClick={() => setAdding(true)}>Add an article link</button>
           </section>
           <section className="rail-section">
             <div className="rail-title">
@@ -1352,6 +1587,16 @@ function MarkyExperience({
               <p className="section-kicker">Reading preferences</p>
               <h2 id="topics-title">Manage your followed topics</h2>
               <p>Select the topics you want to follow. Your feed will automatically refresh with matching content.</p>
+              <label className="topics-select-all">
+                <input
+                  type="checkbox"
+                  checked={selectedTopicDraft.length === interests.length}
+                  onChange={() =>
+                    setSelectedTopicDraft((prev) => (prev.length === interests.length ? [] : [...interests]))
+                  }
+                />
+                {selectedTopicDraft.length === interests.length ? "Deselect all" : "Select all"}
+              </label>
               <div className="topic-card-grid">
                 {interests.map((topicName) => {
                   const isSelected = selectedTopicDraft.includes(topicName);
@@ -1482,22 +1727,22 @@ function MarkyExperience({
                   <ReadingTime item={selectedItem} separator />
                 </div>
                 <p className="brief-summary">{selectedItem.excerpt}</p>
+                {briefPoints.length ? (
+                  <div className="brief-points">
+                    <strong>Key points</strong>
+                    <ul>
+                      {briefPoints.map((point, index) => (
+                        <li key={index}>{point}</li>
+                      ))}
+                    </ul>
+                    <p className="brief-points-note">
+                      Sentences taken from the article itself, not a rewrite.
+                    </p>
+                  </div>
+                ) : null}
                 {articleLoading ? <p className="brief-article-status">Loading the article…</p> : null}
                 {article?.id === selectedItem.id && article.bodyText ? (
                   <div className="brief-article">
-                    {briefPoints.length ? (
-                      <div className="brief-points">
-                        <strong>Key points</strong>
-                        <ul>
-                          {briefPoints.map((point, index) => (
-                            <li key={index}>{point}</li>
-                          ))}
-                        </ul>
-                        <p className="brief-points-note">
-                          Sentences taken from the article itself, not a rewrite.
-                        </p>
-                      </div>
-                    ) : null}
                     {showFullArticle ? (
                       <>
                         {articleParagraphs(article.bodyText).map((paragraph, index) => (
