@@ -124,7 +124,7 @@ Submission lifecycle: `queued → processing → completed | failed`.
 
 ## 9. Feed and ranking
 
-- `For you` may use interests and affinity, but saved items must remain visible and appear first — except items the reader submitted themselves, which are excluded from the dashboard and shown only in Saved (changed 2026-09-10).
+- `For you` may use interests and affinity. It does **not** show items the reader has saved or submitted: those live on the Saved page only (submitted excluded 2026-09-10, saved excluded 2026-09-14). `Trending` and `Latest` still show saved items, exempt from the recency window, so a saved story survives a refresh there.
 - `Trending` prioritizes recency, public engagement, and independent-source diversity.
 - `Latest` orders known dates newest-first and handles unknown dates explicitly.
 - Never fabricate engagement, dates, authors, source counts, or explanations.

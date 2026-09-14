@@ -33,6 +33,12 @@ Use the real calendar date of the change. If an entry is reconstructed later, sa
 
 ## 2026-09-14 — Latin-script language gate and key points on cards
 
+### Changed (product)
+- **For You no longer shows saved stories.** They belong to the Saved page; For You is the
+  briefing of what the reader has not dealt with yet. The saved-first ordering is gone with
+  it. Trending and Latest keep showing saved items, exempt from the recency window. A story
+  saved from For You stays on screen until the next load, then moves to Saved.
+
 ### Added
 - **Key points on every card that has a body.** `GET /api/feed` attaches `keyPoints` (three to
   five sentences, verbatim from `body_content`, chosen by the existing extractive

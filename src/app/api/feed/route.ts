@@ -27,8 +27,11 @@ const FEED_PAGE_SIZE = 50;
  * A search is an archive lookup by definition, so it always uses the wide
  * window whatever view it was typed into.
  *
- * Saved items are exempt in every view (see the filter below): a saved article
- * must survive a refresh no matter how old it is.
+ * Saved items are exempt from the window in Trending and Latest (see the filter
+ * below): a saved article must survive a refresh no matter how old it is. For
+ * You excludes them altogether (changed 2026-09-14): it is the briefing of
+ * what the reader has not dealt with yet, and a saved story already has a
+ * home on the Saved page.
  */
 const FEED_WINDOW_DAYS: Record<FeedView, number> = {
   "for-you": 3,
@@ -311,7 +314,11 @@ export async function GET(request: NextRequest) {
       if (savedTab === "links" ? !submitted : submitted) return false;
     }
     if (!isReadable(row as unknown as ContentItemRow, saved || submitted)) return false;
-    // A saved item is always visible, even if qualification later retired it.
+    // For You is what the reader has not dealt with yet; a saved story lives
+    // on the Saved page and is not repeated here.
+    if (!savedLibrary && view === "for-you" && saved) return false;
+    // Elsewhere a saved item is always visible, even if qualification later
+    // retired it.
     if (saved) return true;
     if (row.is_hidden) return false;
     const published = row.published_at ? Date.parse(row.published_at) : Number.NaN;
@@ -332,14 +339,11 @@ export async function GET(request: NextRequest) {
   console.log(`[Feed API] Topic relevance kept ${relevant.length} of ${items.length} item(s) for:`, selectedTopicNames, query ? `query="${query}"` : "");
 
   const ordered = rankItems(relevant, view, selectedTopicNames);
-  const savedFirst = view === "for-you"
-    ? [...ordered.filter((item) => item.saved), ...ordered.filter((item) => !item.saved)]
-    : ordered;
-  const page = pageOf(savedFirst, cursor);
+  const page = pageOf(ordered, cursor);
   const pageItems = await withKeyPoints(admin, page.items);
 
   return NextResponse.json(
-    { items: pageItems, selectedTopics: selectedTopicNames, nextCursor: page.nextCursor, total: savedFirst.length, personalized: true },
+    { items: pageItems, selectedTopics: selectedTopicNames, nextCursor: page.nextCursor, total: ordered.length, personalized: true },
     { headers: { "Cache-Control": "private, no-store" } },
   );
 }
