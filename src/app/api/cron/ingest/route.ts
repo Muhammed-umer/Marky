@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { ingestSource, type IngestionSource } from "@/lib/ingestion";
+import type { IngestionSource } from "@/lib/ingestion/types";
 import { runWithConcurrency } from "@/lib/ingestion/scheduler";
 import { matchesKind, parseIngestKind } from "@/lib/ingestion/source-kinds";
 import { createAdminSupabaseClient } from "@/lib/supabase";
@@ -35,6 +35,21 @@ async function runIngestion(request: Request) {
 
   const supabase = createAdminSupabaseClient();
   if (!supabase) return NextResponse.json({ error: "Data service unavailable." }, { status: 503 });
+
+  // The adapters pull in jsdom and every platform module. Loaded here rather
+  // than at the top of the file so that a module that cannot load on the host
+  // answers the cron with a message an operator can read, instead of the
+  // empty 500 the platform returns when a route fails at import time.
+  let ingestion: typeof import("@/lib/ingestion");
+  try {
+    ingestion = await import("@/lib/ingestion");
+  } catch (error) {
+    console.error("[Ingestion] Adapter modules failed to load:", error);
+    return NextResponse.json(
+      { error: "Ingestion code failed to load.", code: "INGESTION_MODULE_LOAD_FAILED", detail: error instanceof Error ? `${error.name}: ${error.message}` : String(error) },
+      { status: 503 },
+    );
+  }
 
   const [{ data: sourceRows, error: sourceError }, { data: topicRows, error: topicError }] = await Promise.all([
     supabase
@@ -74,7 +89,7 @@ async function runIngestion(request: Request) {
   // now dominated by two network waits (the feed, then page extraction) rather
   // than a long tail of database round trips, so more of them overlap safely
   // inside the 60s budget.
-  const results = await runWithConcurrency(dueSources, 8, (source) => ingestSource(supabase, source, topicRows ?? []));
+  const results = await runWithConcurrency(dueSources, 8, (source) => ingestion.ingestSource(supabase, source, topicRows ?? []));
   const failed = results.filter((result) => result.status === "failed");
 
   // Page-fetch failures across the whole run, by host and code, so a publisher
