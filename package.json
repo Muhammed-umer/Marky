@@ -20,7 +20,7 @@
     "@supabase/supabase-js": "latest",
     "fast-xml-parser": "5.11.1",
     "framer-motion": "latest",
-    "jsdom": "latest",
+    "jsdom": "27.2.0",
     "lucide-react": "latest",
     "next": "latest",
     "react": "latest",

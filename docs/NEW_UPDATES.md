@@ -79,6 +79,12 @@ Use the real calendar date of the change. If an entry is reconstructed later, sa
   2026-09-14): 39 sources, 130 fetched, 63 inserted (35 Hacker News, 18 GitHub releases,
   10 DEV.to), 70 pages enriched, 9 refused (Reuters, Bloomberg, WSJ, Economist paywalls), 0
   ingestion failures after the redirect fix. Bodies are being stored again.
+- **Vercel runtime.** After the deploy, every route that loads the extractor (`ingest`,
+  `process-links`, `backfill`, `submissions`) answered an empty 500 before its auth check.
+  The two cron routes now import their heavy modules inside the handler and answer 503 with
+  the error, which read: `ERR_REQUIRE_ESM: require() of ES Module @exodus/bytes/encoding-lite.js
+  from html-encoding-sniffer` — jsdom 30's dependency needs Node 20.19+ / 22.12+, and the
+  `engines` range `>=22` is not a form Vercel maps to a runtime. Pinned to `"22.x"`.
 
 ### Known limitations
 - **Medium.** Medium's Cloudflare answers Node's `fetch` with HTTP 403 whatever the headers
