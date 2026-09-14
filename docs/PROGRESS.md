@@ -1,7 +1,7 @@
 # Marky implementation progress
 
-**Last reviewed:** 2026-09-09  
-**Branch:** `markyv1`
+**Last reviewed:** 2026-09-14  
+**Branch:** `main` (fast-forwarded from `markyv1` and pushed 2026-09-14; Vercel production builds from it)
 
 This file answers three questions: what is built, does it pass verification, and how far is it from [`PRODUCT_VISION.md`](./PRODUCT_VISION.md). Dated change detail lives in [`NEW_UPDATES.md`](./NEW_UPDATES.md).
 
@@ -25,7 +25,7 @@ This file answers three questions: what is built, does it pass verification, and
 | Body text stored for feed and submitted items | Done | `content_items.body_content` |
 | Qualification gate (score before storage, reject log) | Done | `src/lib/qualification/`, `discovery_candidates` |
 | Source-declared topics | Done | `source_topics`, seeded for all 13 feeds |
-| Public engagement signals | Done in code — Hacker News, DEV.to, Stack Exchange, GitHub releases and YouTube all write `content_item_signals`; **no producer has run against the live project yet** | `src/lib/ingestion/discovery.ts` |
+| Public engagement signals | Done and run live. First full pass with current code on 2026-09-14 stored 35 Hacker News, 18 GitHub release and 10 DEV.to items with bodies and signals; production cron picks this up once the 2026-09-14 deploy is live | `src/lib/ingestion/discovery.ts` |
 | For You / Trending / Latest ranking | Done | `src/lib/ranking.ts`, `src/app/api/feed/route.ts` |
 | Saved items first in For You; saved items survive refresh | Done | `src/app/api/feed/route.ts` |
 | Save / unsave / read / unread | Done | `src/app/api/items/[id]/state/route.ts` |

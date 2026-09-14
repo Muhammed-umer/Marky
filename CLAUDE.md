@@ -96,7 +96,7 @@ Honesty guarantees are enforced in code, not convention: `isValidAuthor` rejects
 
 ### Known unimplemented paths
 
-Do not assume these work: `nextCursor` is always `null` (no pagination), `POST /api/events` validates and returns `{accepted:true}` without persisting, and no X/API source adapters exist. `docs/PROGRESS.md` is the current status table.
+Do not assume these work: `POST /api/events` validates and returns `{accepted:true}` without persisting, and no X source adapter exists. `GET /api/feed` does page (`cursor` is an offset into the ranked list, 50 per page, `nextCursor` null at the end) as of 2026-09-14. Production runs on Vercel (`marky-ebon.vercel.app`, the `marky_cron_url` Vault secret) and only rebuilds from pushed `main` — an unpushed branch leaves the cron calling old code. `docs/PROGRESS.md` is the current status table.
 
 State as of 2026-09-09. The audit on 2026-09-08 found 169 stored `content_items` with **0 images and 0 body text**, and no quality gate. Steps 1 and 2 of the Discovery Map (below) now address that in code; **the migrations have not yet been applied to the live project**, so the live numbers still reflect the old pipeline until `npx supabase db push` runs and `POST /api/cron/backfill` is executed.
 
